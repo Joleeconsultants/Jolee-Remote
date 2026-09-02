@@ -116,7 +116,7 @@ The shell copies those query params onto the hop-core iframe, which auto-connect
 ## Tiny sample client
 
 ```
-node examples/agent.mjs <sessionId> <agentToken> wss://remote.custom.123
+node examples/agent.mjs <sessionId> <agentToken> wss://remote.example.com
 ```
 
 Outbound-connects as the agent, sends placeholder PNG frames, prints input. Proves the pipe. Not a real capture agent.
