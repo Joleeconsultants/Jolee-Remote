@@ -1,0 +1,287 @@
+import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
+import { decodeEnvelope } from "./envelope";
+import { timingSafeEqual } from "./tokens";
+import {
+  DEFAULT_TTL_SECONDS,
+  MAX_TTL_SECONDS,
+  MIN_TTL_SECONDS,
+  type PublicStatus,
+} from "./types";
+
+export type Env = {
+  Session: DurableObjectNamespace<Session>;
+  ASSETS?: Fetcher;
+};
+
+type SessionRow = {
+  id: string;
+  browser_token: string;
+  agent_token: string;
+  expires_at: number;
+  created_at: number;
+  state: string;
+};
+
+type Role = "browser" | "agent";
+
+type ConnState = { role: Role };
+
+export class Session extends Server<Env> {
+  static options = { hibernate: true };
+
+  private tearingDown = false;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        browser_token TEXT NOT NULL,
+        agent_token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        state TEXT NOT NULL
+      )`);
+    });
+  }
+
+  async mint(input: {
+    sessionId: string;
+    browserToken: string;
+    agentToken: string;
+    ttlSeconds?: number;
+  }): Promise<{ sessionId: string; expiresAt: number; ttlSeconds: number }> {
+    const existing = this.loadRow();
+    if (existing) {
+      throw new Error("session already minted");
+    }
+    const ttlSeconds = clampTtl(input.ttlSeconds);
+    const now = Date.now();
+    const expiresAt = now + ttlSeconds * 1000;
+    this.ctx.storage.sql.exec(
+      "INSERT INTO session (id, browser_token, agent_token, expires_at, created_at, state) VALUES (?, ?, ?, ?, ?, ?)",
+      input.sessionId,
+      input.browserToken,
+      input.agentToken,
+      expiresAt,
+      now,
+      "waiting",
+    );
+    await this.ctx.storage.setAlarm(expiresAt);
+    return { sessionId: input.sessionId, expiresAt, ttlSeconds };
+  }
+
+  async status(): Promise<PublicStatus | null> {
+    const row = this.loadRow();
+    if (!row || row.state === "ended") return null;
+    const expired = Date.now() >= row.expires_at;
+    const browserConnected = this.hasRole("browser");
+    const agentConnected = this.hasRole("agent");
+    return {
+      sessionId: row.id,
+      state: expired ? "expired" : browserConnected && agentConnected ? "paired" : "waiting",
+      expiresAt: row.expires_at,
+      browserConnected,
+      agentConnected,
+    };
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+      const denied = this.denyJoin(request);
+      if (denied) return denied;
+    }
+    return super.fetch(request);
+  }
+
+  getConnectionTags(_connection: Connection, context: ConnectionContext): string[] {
+    const role = roleFromRequest(context.request);
+    return role ? [role] : [];
+  }
+
+  async onConnect(connection: Connection<ConnState>, ctx: ConnectionContext): Promise<void> {
+    const role = roleFromRequest(ctx.request);
+    if (!role) {
+      connection.close(4002, "invalid role");
+      return;
+    }
+    // Use serializeAttachment, not setState: PartyServer's setState overwrites
+    // the socket attachment and drops the __pk metadata hibernation needs.
+    connection.serializeAttachment({ role });
+    this.persistPairState();
+    this.broadcastStatus();
+  }
+
+  async onMessage(connection: Connection<ConnState>, message: WSMessage): Promise<void> {
+    if (typeof message === "string") return;
+    const decoded = decodeEnvelope(message as ArrayBuffer | ArrayBufferView);
+    if (!decoded) return;
+    const row = this.loadRow();
+    if (!row || row.state === "ended" || Date.now() >= row.expires_at) return;
+    if (!this.hasRole("browser") || !this.hasRole("agent")) return;
+
+    const sender = this.roleOf(connection);
+    if (decoded.kind === "frame" && sender !== "agent") return;
+    if (decoded.kind === "input" && sender !== "browser") return;
+
+    const target: Role = decoded.kind === "frame" ? "browser" : "agent";
+    for (const peer of this.getConnections<ConnState>(target)) {
+      if (peer.id !== connection.id) peer.send(message);
+    }
+  }
+
+  async onClose(_connection: Connection): Promise<void> {
+    if (this.tearingDown) return;
+    const row = this.loadRow();
+    if (!row) return;
+    await this.teardown();
+  }
+
+  async onError(_connection: Connection, _error: unknown): Promise<void> {
+    if (this.tearingDown) return;
+    const row = this.loadRow();
+    if (!row) return;
+    await this.teardown();
+  }
+
+  async onAlarm(): Promise<void> {
+    const row = this.loadRow();
+    if (!row) return;
+    await this.teardown();
+  }
+
+  private denyJoin(request: Request): Response | null {
+    const row = this.loadRow();
+    if (!row || row.state === "ended") {
+      return jsonError("session not found", 404);
+    }
+    if (Date.now() >= row.expires_at) {
+      return jsonError("session expired", 410);
+    }
+    const role = roleFromRequest(request);
+    const token = tokenFromRequest(request);
+    if (!role) return jsonError("role required", 400);
+    if (!token) return jsonError("token required", 401);
+    const expected = role === "browser" ? row.browser_token : row.agent_token;
+    if (!timingSafeEqual(token, expected)) {
+      return jsonError("invalid token", 403);
+    }
+    if (this.hasRole(role)) {
+      return jsonError(role + " already connected", 409);
+    }
+    return null;
+  }
+
+  private roleOf(connection: Connection<ConnState>): Role | null {
+    const fromState = connection.state?.role;
+    if (fromState === "browser" || fromState === "agent") return fromState;
+    if (connection.tags.includes("browser")) return "browser";
+    if (connection.tags.includes("agent")) return "agent";
+    return null;
+  }
+
+  private hasRole(role: Role): boolean {
+    for (const _conn of this.getConnections(role)) {
+      return true;
+    }
+    return false;
+  }
+
+  private persistPairState(): void {
+    const row = this.loadRow();
+    if (!row || row.state === "ended") return;
+    const paired = this.hasRole("browser") && this.hasRole("agent");
+    const next = paired ? "paired" : "waiting";
+    if (row.state !== next) {
+      this.ctx.storage.sql.exec("UPDATE session SET state = ?", next);
+    }
+  }
+
+  private broadcastStatus(): void {
+    const status = this.snapshot();
+    if (!status) return;
+    this.broadcast(JSON.stringify({ type: "status", ...status }));
+  }
+
+  private snapshot(): PublicStatus | null {
+    const row = this.loadRow();
+    if (!row || row.state === "ended") return null;
+    const browserConnected = this.hasRole("browser");
+    const agentConnected = this.hasRole("agent");
+    const expired = Date.now() >= row.expires_at;
+    return {
+      sessionId: row.id,
+      state: expired ? "expired" : browserConnected && agentConnected ? "paired" : "waiting",
+      expiresAt: row.expires_at,
+      browserConnected,
+      agentConnected,
+    };
+  }
+
+  private loadRow(): SessionRow | null {
+    try {
+      const rows = this.ctx.storage.sql
+        .exec<SessionRow>("SELECT * FROM session LIMIT 1")
+        .toArray();
+      return rows[0] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async teardown(): Promise<void> {
+    if (this.tearingDown) return;
+    this.tearingDown = true;
+    this.ctx.storage.sql.exec("UPDATE session SET state = ?", "ended");
+    for (const conn of this.getConnections()) {
+      try {
+        conn.close(4000, "session ended");
+      } catch {
+        // already closed
+      }
+    }
+    await this.ctx.storage.deleteAll();
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS session (
+        id TEXT PRIMARY KEY,
+        browser_token TEXT NOT NULL,
+        agent_token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        state TEXT NOT NULL
+      )`);
+  }
+}
+
+function clampTtl(ttl?: number): number {
+  const n =
+    typeof ttl === "number" && Number.isFinite(ttl)
+      ? Math.floor(ttl)
+      : DEFAULT_TTL_SECONDS;
+  return Math.min(MAX_TTL_SECONDS, Math.max(MIN_TTL_SECONDS, n));
+}
+
+function roleFromRequest(request: Request): Role | null {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("role");
+  if (q === "browser" || q === "agent") return q;
+  const parts = url.pathname.split("/").filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (last === "browser" || last === "agent") return last;
+  return null;
+}
+
+function tokenFromRequest(request: Request): string | null {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("token");
+  if (q) return q;
+  const auth = request.headers.get("Authorization");
+  if (auth && auth.startsWith("Bearer ")) return auth.slice(7);
+  return null;
+}
+
+function jsonError(error: string, status: number): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}

@@ -1,0 +1,24 @@
+{
+  "name": "jolee-remote",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable Cloudflare Durable Objects session-pairing framework",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "partyserver": "^0.5.10",
+    "partysocket": "^1.1.6"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.34.0"
+  }
+}
