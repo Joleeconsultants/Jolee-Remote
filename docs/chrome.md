@@ -13,14 +13,14 @@ Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`
 The one browser join URL opens Selkies chrome:
 
 ```
-/?session=<id>&token=<browserToken>&hop=<worker-origin>
+https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
 ```
 
 | param | meaning |
 | --- | --- |
 | `session` | session id from `POST /sessions` |
 | `token` | browser join token |
-| `hop` | Worker host; default this origin |
+| `hop` | Worker host; we recommend `remote` on your domain (`remote.example.com`); default this origin |
 
 `joins.browser` from mint is this path (`viewerPath` in `src/joins.ts`). `public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
 

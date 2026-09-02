@@ -6,6 +6,8 @@ Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browse
 
 ## Mint
 
+We recommend the hop at `remote` on your domain (`https://remote.example.com`).
+
 Consumer Worker: `POST /sessions` with optional JSON `{ "ttlSeconds": 900 }` (clamped 1..3600, default 900).
 
 **Production requires a mint secret.** Set Worker env `MINT_SECRET` and send it as:
@@ -17,7 +19,7 @@ Missing or wrong secret → `401`. Local `wrangler dev` with `MINT_SECRET` unset
 
 Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, and `joins`:
 
-- `joins.browser` — Selkies chrome: `/?session=<id>&token=<browserToken>&hop=<worker-host>`
+- `joins.browser` — Selkies chrome: `https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com`
 - `joins.agent` — agent WebSocket path with query-token fallback
 
 ## Open the session (browser)
@@ -25,10 +27,10 @@ Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, 
 The one browser join URL is:
 
 ```
-/?session=<id>&token=<browserToken>&hop=<worker-origin>
+https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
 ```
 
-That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form, e.g. `127.0.0.1:8787`). Built by `viewerPath` / `viewerQuery`.
+That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form, e.g. `remote.example.com`). Built by `viewerPath` / `viewerQuery`.
 
 `/viewer.html` is the canvas hole the chrome iframes. Do not replace Selkies with a custom page. PartySocket `/parties/session/:id?role=browser&token=` is how that hole connects, not a second product join.
 
@@ -37,12 +39,12 @@ That opens **Selkies chrome** (the product session UI). `hop` is the Worker host
 Hand the agent `sessionId` plus the agent URL and token. Any WebSocket client (do not require PartySocket):
 
 ```
-wss://<hop>/sessions/<id>/agent?token=<agentToken>
+wss://remote.example.com/sessions/<id>/agent?token=<agentToken>
 ```
 
 Token paths (query is fallback):
 
-1. First text message after upgrade: `{"type":"join","token":"<agentToken>"}` on `wss://<hop>/sessions/<id>/agent`
+1. First text message after upgrade: `{"type":"join","token":"<agentToken>"}` on `wss://remote.example.com/sessions/<id>/agent`
 2. `Authorization: Bearer <agentToken>` on the WebSocket upgrade
 3. Query string `?token=` (fallback; still what `joins.agent` returns)
 

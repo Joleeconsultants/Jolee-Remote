@@ -71,10 +71,12 @@ Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `inpu
 
 ## HTTP and WebSocket
 
+We recommend serving the hop at `remote` on your domain (`https://remote.example.com`).
+
 - `POST /sessions` optional JSON `{ "ttlSeconds": 900 }` (1..3600, default 900). **Production requires `MINT_SECRET`**: send `Authorization: Bearer <MINT_SECRET>` or `X-Mint-Secret`. Unset in local `wrangler dev` keeps open mint. Returns `sessionId`, `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, `joins`.
 - `GET /sessions/:id` public status. Does **not** return tokens.
-- **Browser join (the product URL):** `/?session=<id>&token=<browserToken>&hop=<worker-origin>` opens Selkies chrome. `joins.browser` is this path. See [docs/chrome.md](docs/chrome.md).
-- Agent join (any WS client; do not require PartySocket): `wss://<hop>/sessions/<id>/agent?token=` still works as fallback (`joins.agent`). Prefer first text message `{"type":"join","token":"..."}` or `Authorization: Bearer` on the upgrade. Query string remains fallback.
+- **Browser join (the product URL):** `https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com` opens Selkies chrome. `joins.browser` is this path. See [docs/chrome.md](docs/chrome.md).
+- Agent join (any WS client; do not require PartySocket): `wss://remote.example.com/sessions/<id>/agent?token=` still works as fallback (`joins.agent`). Prefer first text message `{"type":"join","token":"..."}` or `Authorization: Bearer` on the upgrade. Query string remains fallback.
 - PartySocket path is how the canvas hole (`/viewer.html`) implements the browser socket, not a second product join: `/parties/session/:id?role=browser&token=...`.
 
 Auth in this repo is the mint secret plus mint-time join tokens. No tenants, device directory, portal, or fleet agent. 1:1 pairing; N browsers is a later consumer need.
@@ -85,10 +87,10 @@ Consumer plug-in checklist (mint secret, Selkies join URL, envelope, token paths
 
 The agent is a WebSocket **client**.
 
-1. Your app calls `POST /sessions` with the mint secret and receives `sessionId` + `agentToken`. Open the browser at `joins.browser` (`/?session=&token=&hop=`).
+1. Your app calls `POST /sessions` with the mint secret and receives `sessionId` + `agentToken`. Open the browser at `joins.browser` (`https://remote.example.com/?session=&token=&hop=remote.example.com`).
 2. Connect outbound:
 
-   `wss://<worker-host>/sessions/<sessionId>/agent?token=<agentToken>`
+   `wss://remote.example.com/sessions/<sessionId>/agent?token=<agentToken>`
 
    Better: omit the query token and send `{"type":"join","token":"<agentToken>"}` as the first text message, or `Authorization: Bearer <agentToken>` on the upgrade. Query string is fallback. Any WebSocket client works.
 3. Wait until you see a `status` message with `state: "paired"` (browser is in).
@@ -104,7 +106,7 @@ Hibernation: the session class extends `partyserver` `Server` with `static optio
 The one browser join URL is:
 
 ```
-/?session=<id>&token=<browserToken>&hop=<worker-origin>
+https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
 ```
 
 That opens **Selkies chrome** (modified dashboard, MPL-2.0) as the product session UI. There is no custom join page. `viewerPath` in `src/joins.ts` builds this URL.
