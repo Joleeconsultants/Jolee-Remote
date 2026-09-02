@@ -108,8 +108,9 @@ No RFB. The hop does not interpret pixels, codecs, or OS events. Malformed envel
 
 The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSON in kind `input`. Honor these shapes on the device:
 
-- `{t:"pointer", e, x, y, b}` — `e` is `move` / `down` / `up`; `x`/`y` are 0–1
-- `{t:"key", e, key, code}` — `e` is `down` / `up`
+- `{t:"pointer", e, x, y, b}` — `e` is `move` / `down` / `up`; `x`/`y` are 0–1 over the displayed image (`object-fit` contain vs stretch). `b` is `buttons` on move, `button` on down/up
+- `{t:"wheel", dx, dy, x, y}` — canvas wheel; `dx`/`dy` are `deltaX`/`deltaY`; context menu is suppressed so right-click stays in the session
+- `{t:"key", e, key, code}` — `e` is `down` / `up`. Keys are captured on the canvas after pointerdown focus, not from dashboard `.allow-native-input`
 - `{t:"clipboard", text}` — browser → agent (sidebar PC Clipboard, text)
 - `{t:"clipboard", mime, data}` — browser → agent image clipboard. `mime` starts with `image/` (default `image/png`); `data` is base64. The viewer skips the send if the encoded envelope would exceed 1 MiB.
 - `{t:"resize", w, h}` — set capture size from the original screen panel
@@ -124,7 +125,17 @@ To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose pa
 - `{"t":"clipboard","text":"..."}` — posts `clipboardContentUpdate` `{text}` to the parent
 - `{"t":"clipboard","mime":"image/png","data":"<base64>"}` — posts `clipboardImageUpdate` `{mime, data}` to the parent (the sidebar may ignore inbound images)
 
-Image clipboard stays on input JSON / JSON frame (kind `0x02` / kind `0x01`). Do not invent extra envelope kinds except audio `0x03`: audio is a byte stream like frames, so it is its own kind. The hop does not decode codecs. The viewer plays kind `0x03` as a complete media chunk (`Blob` + `Audio`; tries `audio/webm`, `ogg`, `wav`, `mpeg`). Sample `examples/agent.mjs` can keep sending frames only.
+The same JSON-frame pattern carries the remote cursor *shape* (not pointer position). Overlay position follows the local pointer so it does not wait on JPEG fps; the agent supplies the bitmap + hotspot. Default overlay is a drawn arrow until a cursor frame arrives. Do not add envelope kind `0x04`.
+
+- `{"t":"cursor","visible":true,"hx":0,"hy":1,"mime":"image/png","data":"<base64>"}` — show overlay, set hotspot (`hx`,`hy`) and swap the overlay image
+- `{"t":"cursor","visible":false}` — hide the overlay
+- Missing `visible` means shown. If `mime`/`data` are omitted, keep the current (or default) arrow
+
+Pointer / key / wheel remain **input** JSON (browser → agent). Cursor JSON is a **frame** (agent → browser). CSS cursors toggle (original dashboard UI) hides the overlay and uses a normal local pointer; default is the remote overlay (`canvas.style.cursor='none'`).
+
+A consumer applies pointer/key/wheel to the OS. Windows SendInput is out of this repo. Sample `examples/agent.mjs` proves the pipe + can send one cursor bitmap; it only logs input.
+
+Image clipboard and cursor stay on input JSON / JSON frame (kind `0x02` / kind `0x01`). Do not invent extra envelope kinds except audio `0x03`: audio is a byte stream like frames, so it is its own kind. The hop does not decode codecs. The viewer plays kind `0x03` as a complete media chunk (`Blob` + `Audio`; tries `audio/webm`, `ogg`, `wav`, `mpeg`).
 
 Frames and audio stay agent → browser. Input stays browser → agent.
 
@@ -132,7 +143,7 @@ Frames and audio stay agent → browser. Input stays browser → agent.
 
 Microphone (browser → agent audio), files, apps, sharing, webcam, stats, shortcuts, encoder / video settings (no pixelflux on this hop; agent owns capture encode). Gaming stays out unless asked.
 
-Visible chrome after this hop: screen (scale, AA, CSS cursors, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback, fullscreen, theme, mobile keyboard.
+Visible chrome after this hop: screen (scale, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback, fullscreen, theme, mobile keyboard.
 
 ### Max binary message size
 

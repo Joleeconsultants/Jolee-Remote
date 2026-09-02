@@ -6,15 +6,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
-main{padding:0;height:100%}
-canvas{display:block;width:100%;height:100%;background:#000;object-fit:contain}
+main{padding:0;height:100%;position:relative}
+#stage{position:relative;width:100%;height:100%}
+canvas{display:block;width:100%;height:100%;background:#000;object-fit:contain;touch-action:none}
 canvas.stretch{object-fit:fill}
+#remote-cursor{position:absolute;left:0;top:0;pointer-events:none;user-select:none;z-index:2;display:none;max-width:none;border:0}
 #vk{display:none}
 #vk.show{display:block;position:absolute;left:-9999px}
 </style></head>
 <body>
 <main>
+<div id="stage">
 <canvas id="surface" width="640" height="360" tabindex="0"></canvas>
+<img id="remote-cursor" alt="" draggable="false" />
+</div>
 <input id="vk" type="text" autocomplete="off" aria-hidden="true" />
 </main>
 <script type="module">
@@ -22,7 +27,11 @@ canvas.stretch{object-fit:fill}
 import PartySocket from "https://esm.sh/partysocket@1.1.6";
 const VERSION=1, KIND_FRAME=1, KIND_INPUT=2, KIND_AUDIO=3;
 const AUDIO_TYPES=["audio/webm","audio/ogg","audio/wav","audio/mpeg"];
+const DEFAULT_CURSOR_SVG="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round" d="M1 1v16.5l4.2-4.3 3.3 8 2.5-1-3.3-7.9H15z"/></svg>');
+const DEFAULT_CURSOR_HX=1, DEFAULT_CURSOR_HY=1;
 const canvas=document.getElementById("surface");
+const stage=document.getElementById("stage");
+const cursorEl=document.getElementById("remote-cursor");
 const vk=document.getElementById("vk");
 const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
@@ -32,12 +41,21 @@ let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true, antiAliasing=true;
 let audioEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
+// Remote overlay is the default (Selkies idea). CSS cursors toggle (original UI) switches to a local pointer.
+let useBrowserCursors=false, pointerOver=false, agentCursorVisible=true;
+let cursorHx=DEFAULT_CURSOR_HX, cursorHy=DEFAULT_CURSOR_HY;
+cursorEl.src=DEFAULT_CURSOR_SVG;
 function applyScale(){
   canvas.classList.toggle("stretch", !scaleLocally);
 }
 function applySmoothing(){
   ctx.imageSmoothingEnabled=!!antiAliasing;
   ctx.imageSmoothingQuality=antiAliasing?"high":"low";
+}
+function applyCursorMode(){
+  canvas.style.cursor=useBrowserCursors?"default":"none";
+  const show=!useBrowserCursors && pointerOver && agentCursorVisible;
+  cursorEl.style.display=show?"block":"none";
 }
 function setStatus(state){
   if(window.parent!==window){
@@ -53,19 +71,67 @@ function decodeEnvelope(data){
   if(bytes[1]===KIND_AUDIO)return {kind:"audio",payload:bytes.subarray(2)};
   return null;
 }
-function clipboardTextFromFrame(payload){
+function parseJsonFrameObject(payload){
   try{
     let i=0;
     while(i<payload.length&&(payload[i]===0x20||payload[i]===0x09||payload[i]===0x0a||payload[i]===0x0d)) i++;
     if(i>=payload.length||payload[i]!==0x7b) return null;
     const obj=JSON.parse(new TextDecoder().decode(payload));
-    if(!(obj&&typeof obj==="object"&&(obj.t==="clipboard"||obj.type==="clipboard"))) return null;
-    if(typeof obj.mime==="string"&&obj.mime.indexOf("image/")===0&&typeof obj.data==="string"){
-      return {kind:"image",mime:obj.mime,data:obj.data};
-    }
-    if(typeof obj.text==="string") return {kind:"text",text:obj.text};
-  }catch(e){}
+    if(!(obj&&typeof obj==="object")) return null;
+    return obj;
+  }catch(e){return null;}
+}
+function clipboardTextFromFrame(payload){
+  const obj=parseJsonFrameObject(payload);
+  if(!obj) return null;
+  if(!(obj.t==="clipboard"||obj.type==="clipboard")) return null;
+  if(typeof obj.mime==="string"&&obj.mime.indexOf("image/")===0&&typeof obj.data==="string"){
+    return {kind:"image",mime:obj.mime,data:obj.data};
+  }
+  if(typeof obj.text==="string") return {kind:"text",text:obj.text};
   return null;
+}
+function cursorFromFrame(payload){
+  const obj=parseJsonFrameObject(payload);
+  if(!obj) return null;
+  if(!(obj.t==="cursor"||obj.type==="cursor")) return null;
+  const hx=typeof obj.hx==="number"&&isFinite(obj.hx)?obj.hx:0;
+  const hy=typeof obj.hy==="number"&&isFinite(obj.hy)?obj.hy:0;
+  const mime=typeof obj.mime==="string"?obj.mime:"";
+  const data=typeof obj.data==="string"?obj.data:"";
+  return {visible:obj.visible!==false,hx,hy,mime,data};
+}
+function applyCursorFrame(cur){
+  agentCursorVisible=!!cur.visible;
+  if(cur.visible){
+    if(cur.mime&&cur.data){
+      cursorEl.src="data:"+cur.mime+";base64,"+cur.data;
+      cursorHx=cur.hx;
+      cursorHy=cur.hy;
+    }else if(!cursorEl.src){
+      cursorEl.src=DEFAULT_CURSOR_SVG;
+      cursorHx=DEFAULT_CURSOR_HX;
+      cursorHy=DEFAULT_CURSOR_HY;
+    }
+  }
+  applyCursorMode();
+}
+function contentBox(){
+  const r=canvas.getBoundingClientRect();
+  if(!scaleLocally) return {left:r.left,top:r.top,width:r.width,height:r.height};
+  const bw=canvas.width||1, bh=canvas.height||1;
+  const scale=Math.min(r.width/bw, r.height/bh);
+  const dw=bw*scale, dh=bh*scale;
+  return {left:r.left+(r.width-dw)/2, top:r.top+(r.height-dh)/2, width:dw, height:dh};
+}
+function pointerNorm(e){
+  const b=contentBox();
+  const w=b.width||1, h=b.height||1;
+  return {x:(e.clientX-b.left)/w, y:(e.clientY-b.top)/h};
+}
+function moveOverlay(e){
+  const r=stage.getBoundingClientRect();
+  cursorEl.style.transform="translate("+(e.clientX-r.left-cursorHx)+"px,"+(e.clientY-r.top-cursorHy)+"px)";
 }
 async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;applySmoothing();ctx.drawImage(bitmap,0,0);bitmap.close();}
 async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;applySmoothing();ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
@@ -158,13 +224,19 @@ function connect(opts){
       }
       return;
     }
+    const cur=cursorFromFrame(env.payload);
+    if(cur!==null){
+      applyCursorFrame(cur);
+      return;
+    }
     paintFrame(env.payload);
   });
 }
 function sendInput(payload){if(!socket||socket.readyState!==1)return;socket.send(encodeInput(payload));}
 function requestFullscreen(){
-  const req=canvas.requestFullscreen||canvas.webkitRequestFullscreen;
-  if(req) Promise.resolve(req.call(canvas)).catch(()=>{});
+  const el=stage;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(req) Promise.resolve(req.call(el)).catch(()=>{});
 }
 function showVirtualKeyboard(){
   canvas.focus();
@@ -192,9 +264,42 @@ async function clipboardImageUpdateFromUI(blob){
     socket.send(encoded);
   }catch(e){}
 }
-canvas.addEventListener("pointermove",(e)=>{const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"move",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.buttons});});
-canvas.addEventListener("pointerdown",(e)=>{canvas.setPointerCapture(e.pointerId);const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"down",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.button});});
-canvas.addEventListener("pointerup",(e)=>{const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"up",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.button});});
+canvas.addEventListener("pointermove",(e)=>{
+  pointerOver=true;
+  moveOverlay(e);
+  applyCursorMode();
+  const p=pointerNorm(e);
+  sendInput({t:"pointer",e:"move",x:p.x,y:p.y,b:e.buttons});
+});
+canvas.addEventListener("pointerdown",(e)=>{
+  canvas.focus();
+  canvas.setPointerCapture(e.pointerId);
+  pointerOver=true;
+  moveOverlay(e);
+  applyCursorMode();
+  const p=pointerNorm(e);
+  sendInput({t:"pointer",e:"down",x:p.x,y:p.y,b:e.button});
+});
+canvas.addEventListener("pointerup",(e)=>{
+  const p=pointerNorm(e);
+  sendInput({t:"pointer",e:"up",x:p.x,y:p.y,b:e.button});
+});
+canvas.addEventListener("pointerenter",(e)=>{
+  pointerOver=true;
+  moveOverlay(e);
+  applyCursorMode();
+});
+canvas.addEventListener("pointerleave",()=>{
+  pointerOver=false;
+  applyCursorMode();
+});
+canvas.addEventListener("wheel",(e)=>{
+  e.preventDefault();
+  const p=pointerNorm(e);
+  sendInput({t:"wheel",dx:e.deltaX,dy:e.deltaY,x:p.x,y:p.y});
+},{passive:false});
+canvas.addEventListener("contextmenu",(e)=>{e.preventDefault();});
+// Keys stay on the canvas (and #vk). Do not window-capture: dashboard .allow-native-input must keep typing.
 canvas.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,code:e.code});e.preventDefault();});
 canvas.addEventListener("keyup",(e)=>{sendInput({t:"key",e:"up",key:e.key,code:e.code});e.preventDefault();});
 vk.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,code:e.code});});
@@ -225,7 +330,8 @@ window.addEventListener("message",(event)=>{
       applySmoothing();
       break;
     case "setUseBrowserCursors":
-      canvas.style.cursor=msg.value?"default":"none";
+      useBrowserCursors=!!msg.value;
+      applyCursorMode();
       break;
     case "pipelineControl":
       if(msg.pipeline==="audio") setAudioEnabled(!!msg.enabled);
@@ -253,7 +359,7 @@ window.addEventListener("message",(event)=>{
       if(msg.settings) sendInput({t:"settings",settings:msg.settings});
       break;
     // Hidden until hop exists: microphone, files, apps, sharing, webcam, stats, shortcuts, encoder/video.
-    // Gaming stays noop.
+    // Gaming stays noop. Pointer lock is not used.
     case "gamepadControl":
     case "requestGamingMode":
     case "command":
@@ -272,6 +378,7 @@ window.addEventListener("message",(event)=>{
 });
 applyScale();
 applySmoothing();
+applyCursorMode();
 setStatus("disconnected");
 if(session.trim()&&token.trim()) connect();
 </script></body></html>

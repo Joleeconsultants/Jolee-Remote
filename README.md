@@ -38,7 +38,7 @@ Then run the sample agent against the hop (defaults to `ws://127.0.0.1:8787`):
 node examples/agent.mjs <sessionId> <agentToken>
 ```
 
-When both sides are in, the hop forwards placeholder frames and prints input.
+When both sides are in, the hop forwards placeholder frames (and one cursor JSON frame so the overlay can swap to a bitmap) and prints pointer/key/wheel input.
 
 **Production layout:** put the session HTML at `https://remote.example.com` (`remote` subdomain on your domain). The hop Worker can be any host — that is the `hop` query param. If HTML and Worker are split:
 
@@ -104,7 +104,7 @@ Text WebSocket messages are control JSON from the Durable Object, not the envelo
 
 A connecting peer may send `{"type":"join","token":"..."}` as its first text message instead of putting the token in the query string.
 
-Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `input`, e.g. `{ "t": "pointer", "e": "move", "x": 0.5, "y": 0.5 }`. Frame payload is typically a JPEG/WebP still — the viewer paints with `createImageBitmap` / `drawImage`.
+Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `input`, e.g. `{ "t": "pointer", "e": "move", "x": 0.5, "y": 0.5 }` or `{ "t": "wheel", "dx": 0, "dy": 120, "x": 0.5, "y": 0.5 }`. Frame payload is typically a JPEG/WebP still — the viewer paints with `createImageBitmap` / `drawImage`. A JSON frame `{ "t": "cursor", "visible": true, "hx": 0, "hy": 1, "mime": "image/png", "data": "..." }` sets the overlay shape (position follows the local pointer).
 
 ## HTTP and WebSocket
 
@@ -163,7 +163,7 @@ node examples/agent.mjs <sessionId> <agentToken>
 node examples/agent.mjs <sessionId> <agentToken> wss://hop.example.com
 ```
 
-Outbound-connects as the agent to the hop Worker (not the HTML host), sends placeholder PNG frames, prints input. Proves the pipe. Not a real capture agent. Optional third arg is the hop WebSocket origin; default `ws://127.0.0.1:8787`.
+Outbound-connects as the agent to the hop Worker (not the HTML host), sends placeholder PNG frames plus one cursor JSON frame, prints input. Proves the pipe and overlay visual. Not a real capture agent and not a Windows SendInput product. Optional third arg is the hop WebSocket origin; default `ws://127.0.0.1:8787`.
 
 ## Develop
 

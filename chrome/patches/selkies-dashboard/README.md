@@ -1,10 +1,14 @@
+This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
+
 # Selkies dashboard patches
 
 ## Goal
 
-The product goal is to build ALL recommended remote-desktop features this way: add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
 
-Leftover list = recommended features not yet hopped, not a junk drawer.
+Add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+
+Leftover list = recommended features not yet hopped, not a junk drawer. CSS cursors is original dashboard UI; the remote cursor overlay is hop core.
 
 Quilt-style series applied by `scripts/sync-selkies-dashboard.sh` after copying upstream `addons/selkies-dashboard`.
 
@@ -12,13 +16,13 @@ The series rewires Selkies chrome onto the hop canvas. Add chrome back as the ho
 
 ## Visible now (hop exists)
 
-- Screen (scale, AA, CSS cursors, HiDPI, force aligned, UI scaling, resolution)
+- Screen (scale, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution)
 - PC Clipboard (open by default), text + image (`enable_binary_clipboard` unlocked)
 - Audio playback (envelope kind `0x03` agent → browser)
 - Fullscreen and theme
 - Mobile/touch keyboard FAB (original Selkies; not in the sidebar)
 
-Image clipboard stays on input JSON / JSON frame. Audio is envelope kind `0x03` because it is a byte stream like frames. Do not claim the hop has a Selkies pixelflux encoder.
+Image clipboard stays on input JSON / JSON frame. Cursor shape is the same JSON-frame pattern (`{t:"cursor",...}`), not a new envelope kind. Audio is envelope kind `0x03` because it is a byte stream like frames. Do not claim the hop has a Selkies pixelflux encoder. CSS cursors toggle is original UI; overlay follows the local pointer in the hop core.
 
 ## Leftover (recommended features not yet hopped)
 

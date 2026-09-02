@@ -1,8 +1,10 @@
+This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
+
 # Dashboard chrome
 
 `/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop.
 
-`/viewer.html` is the canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
+`/viewer.html` is the canvas hole: PartySocket, byte envelope, canvas paint, remote cursor overlay, pointer/key/wheel input, and postMessage. No header, no Connect button, no status pill.
 
 This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
@@ -10,9 +12,11 @@ Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`
 
 ## Goal
 
-The product goal is to build ALL recommended remote-desktop features this way: add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
 
-Leftover list = recommended features not yet hopped, not a junk drawer.
+Add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+
+Leftover list = recommended features not yet hopped, not a junk drawer. CSS cursors is original dashboard UI; the remote cursor overlay is hop core in `/viewer.html`.
 
 The chrome only keeps controls the hop can actually drive. Add chrome back as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
@@ -48,10 +52,10 @@ Same-origin `window` messages from the parent shell to `iframe#jolee-core`.
 | --- | --- | --- |
 | `connect` | `{session, token, hop}` | PartySocket join as browser |
 | `disconnect` | | close socket |
-| `requestFullscreen` | | parent `#jolee-core` iframe `requestFullscreen` in the click tick (`jolee-bridge.js`); on failure the viewer canvas tries fullscreen |
+| `requestFullscreen` | | parent `#jolee-core` iframe `requestFullscreen` in the click tick (`jolee-bridge.js`); on failure the viewer `#stage` (canvas + cursor overlay) tries fullscreen |
 | `setScaleLocally` | `{value: boolean}` | CSS object-fit contain vs stretch/fill |
 | `setAntiAliasing` | `{value: boolean}` | `ctx.imageSmoothingEnabled` after every canvas size reset |
-| `setUseBrowserCursors` | `{value: boolean}` | `canvas.style.cursor` `default` vs `none` |
+| `setUseBrowserCursors` | `{value: boolean}` | original CSS cursors toggle. `true`: overlay hidden, local `default` pointer. `false` (default): hide OS pointer, draw remote overlay |
 | `showVirtualKeyboard` | | focus canvas and hidden `#vk` |
 | `assistKey` | `{e, key, code}` | input envelope `{t:key,...}` from parent `#keyboard-input-assist` |
 | `clipboardUpdateFromUI` | `{text}` | input envelope `{t:clipboard, text}` if connected |
@@ -73,7 +77,7 @@ Core to parent (only when window.parent is not window):
 
 ## What's left
 
-**Visible now:** screen (scale locally, AA, CSS cursors, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback (kind `0x03`), fullscreen, theme, mobile keyboard.
+**Visible now:** screen (scale locally, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback (kind `0x03`), fullscreen, theme, mobile keyboard. Overlay is hop core; CSS cursors is original UI.
 
 **Hidden until that hop exists** (leftover list):
 
@@ -101,7 +105,9 @@ flowchart LR
 
 ### Goal
 
-The product goal is to build ALL recommended remote-desktop features this way: add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
+
+Add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
 
 Leftover list = recommended features not yet hopped, not a junk drawer.
 
