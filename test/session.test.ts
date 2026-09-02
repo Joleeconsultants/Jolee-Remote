@@ -104,6 +104,8 @@ describe("session hop", () => {
     expect(minted.joins.browser).toBe(
       viewerPath(minted.sessionId, minted.browserToken, "example.com"),
     );
+    expect(minted.joins.browser).toContain("#token=" + minted.browserToken);
+    expect(minted.joins.browser).not.toMatch(/[?&]token=/);
 
     const statusRes = await SELF.fetch("https://example.com/sessions/" + minted.sessionId);
     expect(statusRes.status).toBe(200);

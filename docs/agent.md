@@ -1,14 +1,14 @@
-# Consumer plug-in checklist
+# Plug in your app
 
-Your Worker mints a hop session, stores the ids, hands the outbound agent a join URL + token, and opens **Selkies chrome** as the session UI. This hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. No RFB. N browsers is a later consumer need, not this version.
+Your app mints a hop session, stores the ids, hands the outbound agent a join URL + token, and opens **Selkies chrome** as the session UI. This hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. No RFB. N browsers is a later consumer need, not this version.
 
-Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join). Do not reverse-engineer `src/` for the contract below.
+Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join). 
 
 ## Mint
 
-We recommend the hop at `remote` on your domain (`https://remote.example.com`).
+The session HTML lives at `remote` on your domain (`https://remote.example.com`). Pass `hop` only when the Worker is on another host.
 
-Consumer Worker: `POST /sessions` with optional JSON `{ "ttlSeconds": 900 }` (clamped 1..3600, default 900).
+Your app: `POST /sessions` on the hop Worker with optional JSON `{ "ttlSeconds": 900 }` (clamped 1..3600, default 900).
 
 **Production requires a mint secret.** Set Worker env `MINT_SECRET` and send it as:
 
@@ -19,7 +19,7 @@ Missing or wrong secret → `401`. Local `wrangler dev` with `MINT_SECRET` unset
 
 Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, and `joins`:
 
-- `joins.browser` — Selkies chrome: `https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com`
+- `joins.browser` — path on the hop Worker, token in the fragment (omit hop when HTML and Worker share an origin)
 - `joins.agent` — agent WebSocket path with query-token fallback
 
 ## Open the session (browser)
@@ -27,24 +27,24 @@ Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, 
 The one browser join URL is:
 
 ```
-https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
+https://remote.example.com/?session=<id>#token=<browserToken>
 ```
 
-That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form, e.g. `remote.example.com`). Built by `viewerPath` / `viewerQuery`.
+That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form). Omit it when the HTML and Worker share an origin. Built by `viewerPath` / `viewerQuery`.
 
-`/viewer.html` is the canvas hole the chrome iframes. Do not replace Selkies with a custom page. PartySocket `/parties/session/:id?role=browser&token=` is how that hole connects, not a second product join.
+`/viewer.html` is the canvas hole the chrome iframes. PartySocket `/parties/session/:id?role=browser&token=` is how that hole connects, not a second product join.
 
 ## Agent join
 
 Hand the agent `sessionId` plus the agent URL and token. Any WebSocket client (do not require PartySocket):
 
 ```
-wss://remote.example.com/sessions/<id>/agent?token=<agentToken>
+wss://<worker-host>/sessions/<id>/agent?token=<agentToken>
 ```
 
 Token paths (query is fallback):
 
-1. First text message after upgrade: `{"type":"join","token":"<agentToken>"}` on `wss://remote.example.com/sessions/<id>/agent`
+1. First text message after upgrade: `{"type":"join","token":"<agentToken>"}` on `wss://<worker-host>/sessions/<id>/agent`
 2. `Authorization: Bearer <agentToken>` on the WebSocket upgrade
 3. Query string `?token=` (fallback; still what `joins.agent` returns)
 
@@ -92,4 +92,4 @@ TTL alarm or either **joined** peer dropping ends the session. Later joins are r
 - Devices / identity / fleet agent
 - Capture encoding (JPEG/WebP stills recommended)
 - Applying opaque input JSON on the device
-- Product chrome around Selkies is already this repo's `/`; do not iframe-replace it
+- Session UI is this repo's `/` (Selkies chrome)

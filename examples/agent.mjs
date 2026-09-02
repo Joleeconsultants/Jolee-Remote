@@ -4,8 +4,8 @@
  * Proves the pipe. Not a remote-desktop product and not a real device agent.
  *
  * Usage: node examples/agent.mjs <sessionId> <agentToken> [wsBase]
- * Remote: node examples/agent.mjs <sessionId> <agentToken> wss://remote.example.com
- * wsBase defaults to ws://127.0.0.1:8787
+ * wsBase is the hop Worker origin (not the HTML host). Defaults to ws://127.0.0.1:8787
+ * Example: node examples/agent.mjs <sessionId> <agentToken> wss://hop.example.com
  */
 
 const sessionId = process.argv[2];
@@ -13,7 +13,7 @@ const token = process.argv[3];
 const base = process.argv[4] || "ws://127.0.0.1:8787";
 
 if (!sessionId || !token) {
-  console.error("usage: node examples/agent.mjs <sessionId> <agentToken> [wss://remote.example.com]");
+  console.error("usage: node examples/agent.mjs <sessionId> <agentToken> [wss://hop.example.com]");
   process.exit(1);
 }
 

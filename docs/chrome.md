@@ -1,10 +1,10 @@
 # Dashboard chrome
 
-`/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page. Do not replace Selkies with a custom page.
+`/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. 
 
-`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
+`/viewer.html` is the canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
 
-Jolee Remote does not run Selkies, selkies-web-core, pixelflux, or the Selkies protocol.
+This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
 Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`src/`, `public/viewer.html`, Worker, Durable Object) is MIT.
 
@@ -13,14 +13,14 @@ Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`
 The one browser join URL opens Selkies chrome:
 
 ```
-https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
+https://remote.example.com/?session=<id>#token=<browserToken>
 ```
 
 | param | meaning |
 | --- | --- |
 | `session` | session id from `POST /sessions` |
-| `token` | browser join token |
-| `hop` | Worker host; we recommend `remote` on your domain (`remote.example.com`); default this origin |
+| `token` | browser join token (prefer `#token=` fragment; `?token=` is fallback) |
+| `hop` | Worker host; default this origin. The HTML page is what we recommend on `remote` (`remote.example.com`) |
 
 `joins.browser` from mint is this path (`viewerPath` in `src/joins.ts`). `public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
 

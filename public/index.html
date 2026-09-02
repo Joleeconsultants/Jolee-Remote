@@ -16,9 +16,14 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
 <div id="root"></div>
 <script>
 (function () {
-  var params = new URLSearchParams(location.search);
-  params.set("embedded", "1");
-  document.getElementById("jolee-core").src = "/viewer.html?" + params.toString();
+  var search = new URLSearchParams(location.search);
+  var hash = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  var token = hash.get("token") || search.get("token") || "";
+  search.delete("token");
+  search.set("embedded", "1");
+  var src = "/viewer.html?" + search.toString();
+  if (token) src += "#token=" + encodeURIComponent(token);
+  document.getElementById("jolee-core").src = src;
 })();
 </script>
 <script type="module" src="/dashboard/dashboard.js"></script>

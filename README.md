@@ -1,17 +1,52 @@
 # Jolee Remote
 
-A reusable Cloudflare Durable Objects **session-pairing framework**.
-Other apps plug in their own agent and auth. This repo is the hop plus modified Selkies dashboard chrome over a canvas hole — not a remote-desktop product. There is no custom join page.
+A Cloudflare Worker + Durable Object hop. Mint a session, pair one browser WebSocket with one outbound agent WebSocket, forward opaque `frame` / `input` bytes, hibernate, and tear down on TTL or peer drop.
 
-You already have (or are building) an agent that can outbound-connect, identify a device, capture frames, and inject input. This hop mints a short-lived session, pairs exactly one browser WebSocket with exactly one outbound agent WebSocket, and forwards opaque `frame` / `input` bytes through a hibernatable session Durable Object.
+You bring auth, devices, and capture. Deploy this Worker to your own Cloudflare account. There is no hosted demo.
 
-Example consumer: an agent you already have (for example a LetLeeIn-style agent) that outbound-connects to the session and sends capture/input. The agent itself is out of scope here except as that example.
+**Selkies chrome** at `/` is the session UI (modified Selkies dashboard chrome, not the Selkies streaming stack). `/viewer.html` is the canvas hole that chrome iframes.
 
-## Who this is for
+## Quick start
 
-- You are building the **agent** (the missing piece): outbound WebSocket client, device identity, capture, input.
-- You want a native Cloudflare hop (Worker + Durable Object + hibernation) rather than RFB, a VNC server, or a P2P desktop product.
-- AI / task use that does not need 60 fps is a fine fit.
+```bash
+npm install
+npm test
+npx wrangler dev
+```
+
+Local `wrangler dev` listens at `http://127.0.0.1:8787` with `MINT_SECRET` unset (open mint). HTML and hop are the same origin here.
+
+Mint a session on the Worker (open mint locally):
+
+```
+POST http://127.0.0.1:8787/sessions
+Content-Type: application/json
+{"ttlSeconds": 900}
+```
+
+The `201` JSON includes `sessionId`, `browserToken`, `agentToken`, and `joins`. `joins.browser` is a **path on the hop Worker** (`/?session=<id>&hop=127.0.0.1:8787#token=<browserToken>`). Open it on the local origin, or construct:
+
+```
+http://127.0.0.1:8787/?session=<id>#token=<browserToken>
+```
+
+`hop` can be omitted when the HTML page and the Worker are the same origin (it defaults to this origin). Token is in the fragment so referrers and Worker logs do not keep it; `?token=` is still accepted as a fallback.
+
+Then run the sample agent against the hop (defaults to `ws://127.0.0.1:8787`):
+
+```bash
+node examples/agent.mjs <sessionId> <agentToken>
+```
+
+When both sides are in, the hop forwards placeholder frames and prints input.
+
+**Production layout:** put the session HTML at `https://remote.example.com` (`remote` subdomain on your domain). The hop Worker can be any host — that is the `hop` query param. If HTML and Worker are split:
+
+```
+https://remote.example.com/?session=<id>&hop=<worker-host>#token=<browserToken>
+```
+
+Set Worker secret `MINT_SECRET` and mint against the Worker, not the HTML host (unless they are the same origin).
 
 ## Architecture
 
@@ -71,26 +106,26 @@ Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `inpu
 
 ## HTTP and WebSocket
 
-We recommend serving the hop at `remote` on your domain (`https://remote.example.com`).
+The session HTML lives at `remote` on your domain (`https://remote.example.com`). The hop Worker can be a different host; that is the `hop` query param. Same origin: omit `hop`.
 
 - `POST /sessions` optional JSON `{ "ttlSeconds": 900 }` (1..3600, default 900). **Production requires `MINT_SECRET`**: send `Authorization: Bearer <MINT_SECRET>` or `X-Mint-Secret`. Unset in local `wrangler dev` keeps open mint. Returns `sessionId`, `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, `joins`.
 - `GET /sessions/:id` public status. Does **not** return tokens.
-- **Browser join (the product URL):** `https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com` opens Selkies chrome. `joins.browser` is this path. See [docs/chrome.md](docs/chrome.md).
-- Agent join (any WS client; do not require PartySocket): `wss://remote.example.com/sessions/<id>/agent?token=` still works as fallback (`joins.agent`). Prefer first text message `{"type":"join","token":"..."}` or `Authorization: Bearer` on the upgrade. Query string remains fallback.
+- **Browser join (the product URL):** `https://remote.example.com/?session=<id>#token=<browserToken>` opens Selkies chrome. `joins.browser` is the matching path on the hop Worker. See [docs/chrome.md](docs/chrome.md).
+- Agent join (any WS client; do not require PartySocket): `wss://<worker-host>/sessions/<id>/agent?token=` still works as fallback (`joins.agent`). Prefer first text message `{"type":"join","token":"..."}` or `Authorization: Bearer` on the upgrade. Query string remains fallback.
 - PartySocket path is how the canvas hole (`/viewer.html`) implements the browser socket, not a second product join: `/parties/session/:id?role=browser&token=...`.
 
 Auth in this repo is the mint secret plus mint-time join tokens. No tenants, device directory, portal, or fleet agent. 1:1 pairing; N browsers is a later consumer need.
 
 ## Building the agent
 
-Consumer plug-in checklist (mint secret, Selkies join URL, envelope, token paths): [docs/agent.md](docs/agent.md).
+How to plug in (mint secret, Selkies join URL, envelope, token paths): [docs/agent.md](docs/agent.md).
 
 The agent is a WebSocket **client**.
 
-1. Your app calls `POST /sessions` with the mint secret and receives `sessionId` + `agentToken`. Open the browser at `joins.browser` (`https://remote.example.com/?session=&token=&hop=remote.example.com`).
+1. Your app calls `POST /sessions` with the mint secret and receives `sessionId` + `agentToken`. Open the HTML session page (`https://remote.example.com/?session=<id>#token=<browserToken>`; add `&hop=<worker-host>` if the Worker is elsewhere).
 2. Connect outbound:
 
-   `wss://remote.example.com/sessions/<sessionId>/agent?token=<agentToken>`
+   `wss://<worker-host>/sessions/<sessionId>/agent?token=<agentToken>`
 
    Better: omit the query token and send `{"type":"join","token":"<agentToken>"}` as the first text message, or `Authorization: Bearer <agentToken>` on the upgrade. Query string is fallback. Any WebSocket client works.
 3. Wait until you see a `status` message with `state: "paired"` (browser is in).
@@ -106,31 +141,33 @@ Hibernation: the session class extends `partyserver` `Server` with `static optio
 The one browser join URL is:
 
 ```
-https://remote.example.com/?session=<id>&token=<browserToken>&hop=remote.example.com
+https://remote.example.com/?session=<id>#token=<browserToken>
 ```
 
-That opens **Selkies chrome** (modified dashboard, MPL-2.0) as the product session UI. There is no custom join page. `viewerPath` in `src/joins.ts` builds this URL.
+That opens **Selkies chrome** (modified dashboard, MPL-2.0) as the product session UI. `viewerPath` in `src/joins.ts` builds this URL.
 
-`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket + envelope + paint + input + postMessage. No header, no Connect button, no status pill. Do not tell consumers to replace Selkies with a custom page.
+`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket + envelope + paint + input + postMessage. No header, no Connect button, no status pill. 
 
-The shell copies those query params onto the hop-core iframe, which auto-connects. A host app can also postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the iframe. The core posts status `waiting` | `paired` | `expired` | `disconnected`. The browser WebSocket uses **PartySocket** as the hole implementation. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
+The shell copies those query params onto the hop-core iframe, which auto-connects. A host app can also postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the iframe. The core posts status `waiting` | `paired` | `expired` | `disconnected`. The browser WebSocket uses **PartySocket** as the hole implementation. See docs/chrome.md.
 
 ## Tiny sample client
 
 ```
-node examples/agent.mjs <sessionId> <agentToken> wss://remote.example.com
+node examples/agent.mjs <sessionId> <agentToken>
 ```
 
 Outbound-connects as the agent, sends placeholder PNG frames, prints input. Proves the pipe. Not a real capture agent.
 
 ## Develop
 
-Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`), `build:dashboard`, `sync:dashboard`. Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
+Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`), `build:dashboard`, `sync:dashboard`. Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Deploy this Worker on your Cloudflare account; this repo has no hosted demo.
 
 Local `wrangler dev` leaves `MINT_SECRET` unset (open mint). Production: set Worker secret `MINT_SECRET`.
+
+
 ## Keeping chrome in sync
 
-This repo does not run Selkies and does not copy selkies-web-core. Dashboard chrome is a modified vendored copy of `addons/selkies-dashboard`.
+This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
 Do not bump packages past what the source uses: dashboard npm follows the pinned Selkies package.json; wrangler, workers-types, partyserver, and partysocket follow those sources, not latest-on-npm.
 

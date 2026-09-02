@@ -25,8 +25,9 @@ const canvas=document.getElementById("surface");
 const vk=document.getElementById("vk");
 const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
+const hashParams=new URLSearchParams((location.hash||"").replace(/^#/, ""));
 let session=params.get("session")||"";
-let token=params.get("token")||"";
+let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true;
 function applyScale(){
@@ -57,8 +58,9 @@ function connect(opts){
   disconnect();
   const url=new URL(location.href);
   url.searchParams.set("session",session);
-  url.searchParams.set("token",token);
+  url.searchParams.delete("token");
   if(hop)url.searchParams.set("hop",hop);else url.searchParams.delete("hop");
+  url.hash=token?"token="+encodeURIComponent(token):"";
   history.replaceState(null,"",url);
   socket=new PartySocket({host:host,party:"session",room:session,query:{token:token,role:"browser"}});
   socket.binaryType="arraybuffer";
