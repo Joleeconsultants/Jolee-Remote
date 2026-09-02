@@ -29,6 +29,21 @@ sequenceDiagram
   Note over Session: TTL or peer drop teardown
 ```
 
-# Chrome vs hop
+## Chrome vs hop
 
-The hop in this document is MIT. Dashboard chrome is a modified Selkies example dashboard (MPL-2.0) that overlays the hop core iframe and talks to it with postMessage. Jolee Remote does not run Selkies. Details: chrome.md.
+The dashboard overlay is chrome only (modified Selkies dashboard, MPL-2.0). The hop core, Worker, and session Durable Object stay the MIT session-pairing pipe. Jolee Remote does not run Selkies. See chrome.md.
+
+```mermaid
+flowchart TB
+  subgraph chrome [Browser]
+    Shell[index.html shell]
+    Overlay[Dashboard overlay MPL-2.0]
+    Core[viewer.html hop core MIT]
+    Shell --> Overlay
+    Shell --> Core
+    Overlay -->|postMessage| Core
+  end
+  Core --> Worker[Worker MIT]
+  Worker --> DO[Session Durable Object MIT]
+  Agent[Outbound agent] --> DO
+```
