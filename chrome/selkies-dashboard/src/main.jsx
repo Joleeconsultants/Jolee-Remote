@@ -27,7 +27,7 @@ if (appMountPoint) {
       <App dashboardRoot={dashboardRootElement} />
     </React.StrictMode>,
   );
-  queueMicrotask(postJoleeServerSettings);
+  requestAnimationFrame(function () { postJoleeServerSettings(); setTimeout(postJoleeServerSettings, 0); setTimeout(postJoleeServerSettings, 50); });
 } else {
   console.error("Dashboard mount point #root not found.");
 }
