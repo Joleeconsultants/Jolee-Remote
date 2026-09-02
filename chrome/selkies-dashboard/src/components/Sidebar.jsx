@@ -4793,7 +4793,7 @@ function Sidebar() {
       {isViewerRole && (
         <PlayerGamepadButton touchOnly isActive={isTouchGamepadActive} onToggle={handleToggleTouchGamepad} />
       )}
-      {!isViewerRole && (isMobile || hasDetectedTouch) && isKeyboardButtonVisible && (renderableSettings.keyboardButton ?? true) && (
+      {!isViewerRole && isKeyboardButtonVisible && (renderableSettings.keyboardButton ?? true) && (
         <button
           className={`virtual-keyboard-button theme-${theme} allow-native-input`}
           onClick={onKeyboardButtonClick}
