@@ -12,16 +12,19 @@ describe("dashboard postMessage protocol", () => {
     expect(classifyDashboardMessage({ type: "setScaleLocally", value: true })).toBe("setScaleLocally");
     expect(classifyDashboardMessage({ type: "showVirtualKeyboard" })).toBe("showVirtualKeyboard");
     expect(classifyDashboardMessage({ type: "clipboardUpdateFromUI", text: "hi" })).toBe("clipboardUpdateFromUI");
+    expect(classifyDashboardMessage({ type: "clipboardImageUpdate" })).toBe("clipboardImageUpdate");
     expect(classifyDashboardMessage({ type: "setAntiAliasing", value: false })).toBe("setAntiAliasing");
     expect(classifyDashboardMessage({ type: "setUseBrowserCursors", value: true })).toBe("setUseBrowserCursors");
   });
 
-  it("no-ops Selkies-only pipeline toggles", () => {
+  it("no-ops chrome that has no hop yet", () => {
     expect(classifyDashboardMessage({ type: "pipelineControl", pipeline: "video", enabled: false })).toBe("noop");
     expect(classifyDashboardMessage({ type: "settings", settings: { framerate: 60 } })).toBe("noop");
     expect(classifyDashboardMessage({ type: "command", value: "ls" })).toBe("noop");
     expect(classifyDashboardMessage({ type: "setManualResolution", width: 1920, height: 1080 })).toBe("noop");
     expect(classifyDashboardMessage({ type: "resetResolutionToWindow" })).toBe("noop");
+    expect(classifyDashboardMessage({ type: "gamepadControl", enabled: true })).toBe("noop");
+    expect(classifyDashboardMessage({ type: "requestGamingMode" })).toBe("noop");
   });
 
   it("ignores malformed payloads", () => {

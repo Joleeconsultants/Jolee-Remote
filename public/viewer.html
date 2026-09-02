@@ -50,7 +50,11 @@ function clipboardTextFromFrame(payload){
     while(i<payload.length&&(payload[i]===0x20||payload[i]===0x09||payload[i]===0x0a||payload[i]===0x0d)) i++;
     if(i>=payload.length||payload[i]!==0x7b) return null;
     const obj=JSON.parse(new TextDecoder().decode(payload));
-    if(obj&&typeof obj==="object"&&(obj.t==="clipboard"||obj.type==="clipboard")&&typeof obj.text==="string") return obj.text;
+    if(!(obj&&typeof obj==="object"&&(obj.t==="clipboard"||obj.type==="clipboard"))) return null;
+    if(typeof obj.mime==="string"&&obj.mime.indexOf("image/")===0&&typeof obj.data==="string"){
+      return {kind:"image",mime:obj.mime,data:obj.data};
+    }
+    if(typeof obj.text==="string") return {kind:"text",text:obj.text};
   }catch(e){}
   return null;
 }
@@ -90,7 +94,11 @@ function connect(opts){
     const clip=clipboardTextFromFrame(env.payload);
     if(clip!==null){
       if(window.parent!==window){
-        window.parent.postMessage({type:"clipboardContentUpdate",text:clip}, window.location.origin);
+        if(clip.kind==="image"){
+          window.parent.postMessage({type:"clipboardImageUpdate",mime:clip.mime,data:clip.data}, window.location.origin);
+        }else{
+          window.parent.postMessage({type:"clipboardContentUpdate",text:clip.text}, window.location.origin);
+        }
       }
       return;
     }
@@ -109,6 +117,24 @@ function showVirtualKeyboard(){
 }
 function clipboardUpdateFromUI(text){
   sendInput({t:"clipboard",text:String(text||"")});
+}
+const MAX_ENVELOPE_BYTES=1048576;
+function bytesToBase64(bytes){
+  let bin="";
+  for(let i=0;i<bytes.length;i+=8192){
+    bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+  }
+  return btoa(bin);
+}
+async function clipboardImageUpdateFromUI(blob){
+  if(!(blob instanceof Blob)) return;
+  try{
+    const buf=await blob.arrayBuffer();
+    const encoded=encodeInput({t:"clipboard",mime:blob.type||"image/png",data:bytesToBase64(new Uint8Array(buf))});
+    if(encoded.length>MAX_ENVELOPE_BYTES) return;
+    if(!socket||socket.readyState!==1) return;
+    socket.send(encoded);
+  }catch(e){}
 }
 canvas.addEventListener("pointermove",(e)=>{const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"move",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.buttons});});
 canvas.addEventListener("pointerdown",(e)=>{canvas.setPointerCapture(e.pointerId);const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"down",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.button});});
@@ -132,6 +158,9 @@ window.addEventListener("message",(event)=>{
       break;
     case "showVirtualKeyboard": showVirtualKeyboard(); break;
     case "clipboardUpdateFromUI": clipboardUpdateFromUI(msg.text); break;
+    case "clipboardImageUpdate":
+      clipboardImageUpdateFromUI(msg.imageBlob);
+      break;
     case "assistKey":
       sendInput({t:"key",e:msg.e==="up"?"up":"down",key:msg.key,code:msg.code});
       break;
@@ -142,7 +171,8 @@ window.addEventListener("message",(event)=>{
     case "setUseBrowserCursors":
       canvas.style.cursor=msg.value?"default":"none";
       break;
-    // Hidden Selkies chrome: encoder, audio, gamepad, capture resize, image clipboard.
+    // Hidden until hop exists: encoder, audio, files, apps, sharing, stats, webcam, capture resize.
+    // Gaming stays noop.
     case "pipelineControl":
     case "settings":
     case "gamepadControl":
@@ -159,7 +189,6 @@ window.addEventListener("message",(event)=>{
     case "touchinput:trackpad":
     case "touchinput:touch":
     case "setSynth":
-    case "clipboardImageUpdate":
     case "mode":
       break;
     default:

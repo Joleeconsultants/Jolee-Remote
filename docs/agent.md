@@ -110,11 +110,15 @@ The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSO
 
 - `{t:"pointer", e, x, y, b}` — `e` is `move` / `down` / `up`; `x`/`y` are 0–1
 - `{t:"key", e, key, code}` — `e` is `down` / `up`
-- `{t:"clipboard", text}` — browser → agent (sidebar PC Clipboard)
+- `{t:"clipboard", text}` — browser → agent (sidebar PC Clipboard, text)
+- `{t:"clipboard", mime, data}` — browser → agent image clipboard. `mime` starts with `image/` (default `image/png`); `data` is base64. The viewer skips the send if the encoded envelope would exceed 1 MiB.
 
-To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}` (not an image). The hop does not parse it; the viewer does, then posts `clipboardContentUpdate` to the parent.
+To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose payload is UTF-8 JSON (not pixels). The hop does not parse it; the viewer does:
 
-Do not invent extra envelope kinds. Frames stay agent → browser. Input stays browser → agent.
+- `{"t":"clipboard","text":"..."}` — posts `clipboardContentUpdate` `{text}` to the parent
+- `{"t":"clipboard","mime":"image/png","data":"<base64>"}` — posts `clipboardImageUpdate` `{mime, data}` to the parent (the sidebar may ignore inbound images)
+
+Do not invent extra envelope kinds. Frames stay agent → browser. Input stays browser → agent. Image clipboard uses the same kind `0x02` input / kind `0x01` JSON frame path as text — not a third envelope kind.
 
 ### Max binary message size
 

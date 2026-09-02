@@ -2,29 +2,29 @@
 
 Quilt-style series applied by `scripts/sync-selkies-dashboard.sh` after copying upstream `addons/selkies-dashboard`.
 
-The series exists to rewire Selkies chrome onto the hop canvas **and to hide controls the hop cannot drive**. That hide-unused rule is the point. Do not add patches that put encoder, audio, files, sharing, gamepads, HiDPI, UI scaling, manual resolution, or image clipboard back.
+The series rewires Selkies chrome onto the hop canvas. Add chrome back as the hop grows. Do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop exists. Hide gaming (gamepads, gaming mode, trackpad, extra player seats).
 
 ## Hide unused UI
 
-Only keep sidebar controls the hop can actually act on. Prefer overlay `chrome/selkies-dashboard/src/jolee-settings.js` for hide-flags (`locked: true` / `ui_sidebar_show_*: false`) so Sidebar diffs stay small.
+Prefer overlay `chrome/selkies-dashboard/src/jolee-settings.js` for hide-flags (`locked: true` / `ui_sidebar_show_*: false`) so Sidebar diffs stay small.
 
-**Visible**
+**Visible** (hop exists)
 
 - Screen: scale locally, anti-aliasing, CSS cursors
-- PC Clipboard (open by default, text only)
+- PC Clipboard (open by default), including Image Support / upload (`enable_binary_clipboard` unlocked)
 - Fullscreen and theme
 - Mobile/touch keyboard FAB (original Selkies; not in the sidebar)
 
-**Hidden / locked**
+Image clipboard is a hop path: input JSON `{t:"clipboard", mime, data}` (base64) browser→agent; optional JSON clipboard frame agent→browser. Do not claim the hop has a Selkies pixelflux encoder.
 
-- Sharing, gamepads, encoder/video, audio, files, apps, stats, shortcuts, gaming mode, trackpad, webcam
-- HiDPI (`use_css_scaling`)
-- Force aligned resolution
-- UI scaling / OS DPI
-- Manual and preset resolution (capture size is agent-side; the hop canvas does not resize)
-- Image / binary clipboard
+**Hidden until that hop exists**
 
-If a control cannot change the canvas or send hop input the viewer honors, it does not belong in the chrome.
+- Apps, sharing, files, stats, webcam, audio, encoder/video settings, shortcuts
+- HiDPI (`use_css_scaling`), force aligned resolution, UI scaling / OS DPI, manual and preset resolution
+
+**Hidden (gaming)**
+
+- Gamepads, gaming mode, trackpad, extra player seats (player2/3/4, dual_mode)
 
 ## Overlay vs patches
 

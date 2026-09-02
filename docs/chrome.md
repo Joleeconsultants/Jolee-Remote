@@ -8,7 +8,7 @@ This repo ships modified Selkies dashboard chrome, not the Selkies streaming sta
 
 Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`src/`, `public/viewer.html`, Worker, Durable Object) is MIT.
 
-The chrome only keeps controls the hop can actually drive. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md). Do not put unused Selkies panels back.
+The chrome only keeps controls the hop can actually drive. Add chrome back as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
 ## Join
 
@@ -49,15 +49,17 @@ Same-origin `window` messages from the parent shell to `iframe#jolee-core`.
 | `showVirtualKeyboard` | | focus canvas and hidden `#vk` |
 | `assistKey` | `{e, key, code}` | input envelope `{t:key,...}` from parent `#keyboard-input-assist` |
 | `clipboardUpdateFromUI` | `{text}` | input envelope `{t:clipboard, text}` if connected |
+| `clipboardImageUpdate` | `{imageBlob}` | Blob/File from the sidebar; viewer base64-encodes and sends `{t:clipboard, mime, data}` if the envelope is ≤ 1 MiB |
 
 Core to parent (only when window.parent is not window):
 
 | type | payload |
 | --- | --- |
 | `status` | `{state: waiting | paired | expired | disconnected}` |
-| `clipboardContentUpdate` | `{text}` — viewer saw a frame whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}` (not an image). Hop does not parse it. |
+| `clipboardContentUpdate` | `{text}` — viewer saw a frame whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}`. Hop does not parse it. |
+| `clipboardImageUpdate` | `{mime, data}` — viewer saw a JSON clipboard frame with `mime` starting `image/` and base64 `data`. Sidebar may ignore this. |
 
-**Hidden, not clickable.** Encoder, audio, files, sharing, gamepads, HiDPI, UI scaling, manual resolution, and image clipboard are locked off in `JOLEE_SERVER_SETTINGS` (`chrome/selkies-dashboard/src/jolee-settings.js`). They are not product controls. A leftover postMessage of those types is ignored so a stale build cannot crash the core.
+**Hidden until that hop exists.** Encoder/video, audio, files, apps, sharing, stats, shortcuts, webcam, HiDPI, UI scaling, and manual resolution stay locked off in `JOLEE_SERVER_SETTINGS` (`chrome/selkies-dashboard/src/jolee-settings.js`). Gaming (gamepads, gaming mode, trackpad, extra player seats) stays hidden. Image clipboard is unlocked: it is a hop JSON path, not a Selkies pixelflux encoder. A leftover postMessage of still-hidden types is ignored so a stale build cannot crash the core.
 
 ```mermaid
 flowchart LR
@@ -71,7 +73,7 @@ flowchart LR
 
 This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
-The patch series exists to rewire that chrome onto the hop canvas **and to hide anything the hop cannot drive**. Do not add patches that put encoder, audio, files, sharing, gamepads, HiDPI, UI scaling, manual resolution, or image clipboard back. Prefer overlay `src/jolee-settings.js` hide-flags so Sidebar diffs stay small. See [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
+The patch series exists to rewire that chrome onto the hop canvas. Add chrome back as the hop grows; do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop exists. Hide gaming. Prefer overlay `src/jolee-settings.js` hide-flags so Sidebar diffs stay small. See [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
 Do not bump packages past what the source uses: dashboard npm follows the pinned Selkies package.json; wrangler, workers-types, partyserver, and partysocket follow those sources, not latest-on-npm.
 

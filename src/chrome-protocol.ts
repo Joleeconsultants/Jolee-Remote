@@ -5,6 +5,7 @@ export const HANDLED_DASHBOARD_TYPES = [
   "setScaleLocally",
   "showVirtualKeyboard",
   "clipboardUpdateFromUI",
+  "clipboardImageUpdate",
   "setAntiAliasing",
   "setUseBrowserCursors",
 ] as const;
@@ -26,7 +27,6 @@ export const NOOP_DASHBOARD_TYPES = [
   "touchinput:trackpad",
   "touchinput:touch",
   "setSynth",
-  "clipboardImageUpdate",
   "mode",
 ] as const;
 
@@ -37,6 +37,7 @@ export type DashboardAction =
   | "setScaleLocally"
   | "showVirtualKeyboard"
   | "clipboardUpdateFromUI"
+  | "clipboardImageUpdate"
   | "setAntiAliasing"
   | "setUseBrowserCursors"
   | "noop"

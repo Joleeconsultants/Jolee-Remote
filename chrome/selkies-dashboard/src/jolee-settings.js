@@ -5,9 +5,11 @@
  */
 
 /**
- * Fake serverSettings payload posted to the vendored sidebar so Selkies-only
- * panels stay hidden. The hop has no pixelflux/proot pipeline. Prefer this
- * overlay file for hide-flags so Sidebar patches stay small.
+ * Overlay hide-flags for the vendored sidebar. Add chrome back as the hop
+ * grows; do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop
+ * exists. Hide gaming (gamepads, gaming mode, trackpad, extra players).
+ * Image clipboard is a hop path: enable_binary_clipboard is unlocked.
+ * Prefer this overlay for flags so Sidebar patches stay small.
  * Locked settings make isRenderable return false (or hide the manual
  * resolution block via serverSettings.manual_resolution.locked).
  */
@@ -42,7 +44,7 @@ export const JOLEE_SERVER_SETTINGS = {
   enable_player3: flag(false),
   enable_player4: flag(false),
   enable_dual_mode: flag(false),
-  enable_binary_clipboard: { value: false, locked: true },
+  enable_binary_clipboard: { value: true },
   enable_rate_control: flag(false),
   audio_enabled: { value: false, locked: true },
   microphone_enabled: { value: false, locked: true },
