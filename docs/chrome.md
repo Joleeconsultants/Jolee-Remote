@@ -1,12 +1,28 @@
 # Dashboard chrome
 
-The page at `/` is a shell: a full-viewport hop-core iframe plus a modified Selkies dashboard overlay. The hop core (`/viewer.html`) stays PartySocket + envelope + canvas. Jolee Remote does not run Selkies, selkies-web-core, pixelflux, or the Selkies protocol.
+`/` is the product UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page.
+
+`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
+
+Jolee Remote does not run Selkies, selkies-web-core, pixelflux, or the Selkies protocol.
 
 Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`src/`, `public/viewer.html`, Worker, Durable Object) is MIT.
 
+## Join
+
+Join with query params on `/`:
+
+| param | meaning |
+| --- | --- |
+| `session` | session id from `POST /sessions` |
+| `token` | browser join token |
+| `hop` | Worker host; default this origin |
+
+`public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
+
 ## postMessage contract
 
-Same-origin `window` messages from the parent shell to `iframe#jolee-core` (`/viewer.html?embedded=1`).
+Same-origin `window` messages from the parent shell to `iframe#jolee-core`.
 
 Handled by the hop core:
 
@@ -26,8 +42,6 @@ Core to parent (only when window.parent is not window):
 | `status` | `{state: waiting | paired | expired | disconnected}` |
 
 Other Selkies pipeline toggles (pipelineControl, settings, gamepadControl, setManualResolution, resetResolutionToWindow, setUseCssScaling, setAntiAliasing, audioDeviceSelected, requestGamingMode, command, getStats, sidebarVisibilityChanged, TOUCH_GAMEPAD_SETUP, TOUCH_GAMEPAD_VISIBILITY, touchinput:trackpad, touchinput:touch, setSynth, clipboardImageUpdate, setUseBrowserCursors, mode) are ignored with a one-line comment. They do not crash the core.
-
-Query param `embedded=1` hides the header join bar. HopControls in the dashboard is the join UI.
 
 ```mermaid
 flowchart LR

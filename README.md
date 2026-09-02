@@ -1,7 +1,7 @@
 # Jolee Remote
 
 A reusable Cloudflare Durable Objects **session-pairing framework**.
-Other apps plug in their own agent and auth. This repo is the hop and a thin viewer shell — not a remote-desktop product.
+Other apps plug in their own agent and auth. This repo is the hop plus modified Selkies dashboard chrome over a canvas hole — not a remote-desktop product. There is no custom join page.
 
 You already have (or are building) an agent that can outbound-connect, identify a device, capture frames, and inject input. This hop mints a short-lived session, pairs exactly one browser WebSocket with exactly one outbound agent WebSocket, and forwards opaque `frame` / `input` bytes through a hibernatable session Durable Object.
 
@@ -93,9 +93,13 @@ Rejects: second browser or second agent (`409`). Expired (`410`). Unknown sessio
 
 Hibernation: the session class extends `partyserver` `Server` with `static options = { hibernate: true }`. Connections are tagged `browser` / `agent` via `getConnectionTags`. After wake, tags are restored by the platform; the DO routes using those tags. One Durable Object alarm is the TTL.
 
-## Viewer shell
+## Product UI
 
-Served at `/` (shell with dashboard chrome around an iframe of the core) and `/viewer.html` (core). Query params: `session`, `token` (browser join token), `hop` (Worker host, default this origin). The dashboard posts connect, disconnect, requestFullscreen, setScaleLocally, showVirtualKeyboard, and clipboardUpdateFromUI to the core; the core posts status waiting | paired | expired | disconnected. Uses **PartySocket** for the browser WebSocket only. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
+`/` is the product UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page.
+
+`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket + envelope + paint + input + postMessage. No header, no Connect button, no status pill.
+
+Join with query params on `/`: `session`, `token` (browser join token), `hop` (Worker host, default this origin). The shell copies those onto the hop-core iframe, which auto-connects. A host app can also postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the iframe. The core posts status `waiting` | `paired` | `expired` | `disconnected`. The browser WebSocket uses **PartySocket**. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
 
 ## Tiny sample client
 

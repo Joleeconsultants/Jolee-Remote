@@ -4,12 +4,12 @@ See the root README for the full agent-builder guide. The hop is:
 
 ```mermaid
 flowchart LR
-  Browser[Browser viewer] --> Worker[Worker]
+  Browser[Browser] --> Worker[Worker]
   Worker --> DO[Session Durable Object]
   Agent[Outbound agent] --> DO
 ```
 
-Browser viewer goes through the Worker into the session Durable Object. The agent outbound-connects to that same Durable Object. The DO never dials out.
+The browser goes through the Worker into the session Durable Object. The agent outbound-connects to that same Durable Object. The DO never dials out.
 
 ```mermaid
 sequenceDiagram
@@ -31,13 +31,15 @@ sequenceDiagram
 
 ## Chrome vs hop
 
-The dashboard overlay is chrome only (modified Selkies dashboard, MPL-2.0). The hop core, Worker, and session Durable Object stay the MIT session-pairing pipe. Jolee Remote does not run Selkies. See chrome.md.
+`/` is the product UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page.
+
+`/viewer.html` is not a viewer product. It is the hop core / canvas hole (MIT): PartySocket + envelope + paint + input + postMessage. The Worker and session Durable Object stay the MIT session-pairing pipe. Jolee Remote does not run Selkies. See chrome.md.
 
 ```mermaid
 flowchart TB
   subgraph chrome [Browser]
     Shell[index.html shell]
-    Overlay[Dashboard overlay MPL-2.0]
+    Overlay[Dashboard chrome MPL-2.0]
     Core[viewer.html hop core MIT]
     Shell --> Overlay
     Shell --> Core

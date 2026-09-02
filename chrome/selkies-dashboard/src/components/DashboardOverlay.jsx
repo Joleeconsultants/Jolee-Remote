@@ -5,22 +5,27 @@
  */
 
 /**
- * Portal that places hop controls and the sidebar over the core iframe.
+ * Portal that places the sidebar over the hop core iframe.
  * @module
  */
-import ReactDOM from "react-dom";
-import HopControls from "./HopControls";
-import Sidebar from "./Sidebar";
-import "../styles/Overlay.css";
+import ReactDOM from 'react-dom';
+import Sidebar from './Sidebar';
+import '../styles/Overlay.css';
 
+/**
+ * Renders the sidebar into `container` through a portal, or nothing until a
+ * container exists.
+ * @param {object} props
+ * @param {HTMLElement|null} props.container Element the overlay is portaled into.
+ */
 function DashboardOverlay({ container }) {
+
   if (!container) {
     return null;
   }
 
   return ReactDOM.createPortal(
     <div className="dashboard-overlay-container">
-      <HopControls />
       <Sidebar />
     </div>,
     container

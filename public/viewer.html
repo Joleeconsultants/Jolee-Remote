@@ -5,65 +5,38 @@
 <title>Session hop core</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-html,body{margin:0;height:100%;background:#000;color:#e8e8e8;font-family:ui-sans-serif,system-ui,sans-serif}
-body.embedded header{display:none}
-header{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end;padding:.75rem 1rem;background:#1a1a1a;border-bottom:1px solid #333}
-label{display:flex;flex-direction:column;gap:.2rem;font-size:.75rem;color:#aaa}
-input{background:#000;color:#eee;border:1px solid #444;padding:.4rem .5rem;min-width:12rem}
-button{padding:.45rem .8rem;cursor:pointer}
-#status{font-size:.85rem;padding:.25rem .7rem;border-radius:999px;background:#333}
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
 main{padding:0;height:100%}
-body:not(.embedded) main{padding:1rem;height:auto}
-canvas{display:block;max-width:100%;background:#000;border:1px solid #333}
-body.embedded canvas{width:100%;height:100%;max-width:none;border:0;object-fit:contain}
-body.embedded canvas.stretch{object-fit:fill}
-#hint{color:#888;font-size:.85rem;margin-top:.5rem}
-body.embedded #hint,#vk{display:none}
-body.embedded #vk.show{display:block;position:absolute;left:-9999px}
+canvas{display:block;width:100%;height:100%;background:#000;object-fit:contain}
+canvas.stretch{object-fit:fill}
+#vk{display:none}
+#vk.show{display:block;position:absolute;left:-9999px}
 </style></head>
 <body>
-<header>
-<label>Session <input id="session" autocomplete="off" /></label>
-<label>Browser token <input id="token" autocomplete="off" /></label>
-<label>Hop host <input id="hop" placeholder="this origin" autocomplete="off" /></label>
-<button id="connect" type="button">Connect</button>
-<button id="disconnect" type="button">Disconnect</button>
-<span id="status">disconnected</span>
-</header>
 <main>
 <canvas id="surface" width="640" height="360" tabindex="0"></canvas>
-<p id="hint">Opaque frames paint with the browser. Pointer and keyboard send input envelopes. Query params: session, token, hop. postMessage from the dashboard chrome: connect, disconnect, requestFullscreen, setScaleLocally, showVirtualKeyboard, clipboardUpdateFromUI.</p>
 <input id="vk" type="text" autocomplete="off" aria-hidden="true" />
 </main>
 <script type="module">
 // Must match root package.json partysocket (currently 1.1.6).
 import PartySocket from "https://esm.sh/partysocket@1.1.6";
 const VERSION=1, KIND_FRAME=1, KIND_INPUT=2;
-const sessionEl=document.getElementById("session");
-const tokenEl=document.getElementById("token");
-const hopEl=document.getElementById("hop");
-const statusEl=document.getElementById("status");
 const canvas=document.getElementById("surface");
 const vk=document.getElementById("vk");
 const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
-sessionEl.value=params.get("session")||"";
-tokenEl.value=params.get("token")||"";
-hopEl.value=params.get("hop")||"";
-const embedded=params.get("embedded")==="1";
-if(embedded) document.body.classList.add("embedded");
+let session=params.get("session")||"";
+let token=params.get("token")||"";
+let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true;
 function applyScale(){
   canvas.classList.toggle("stretch", !scaleLocally);
 }
-function postStatus(state){
-  statusEl.textContent=state;
-  const payload={type:"status",state};
+function setStatus(state){
   if(window.parent!==window){
-    window.parent.postMessage(payload, window.location.origin);
+    window.parent.postMessage({type:"status",state}, window.location.origin);
   }
 }
-function setStatus(v){ postStatus(v); }
 function encodeInput(payload){const body=new TextEncoder().encode(JSON.stringify(payload));const out=new Uint8Array(2+body.length);out[0]=VERSION;out[1]=KIND_INPUT;out.set(body,2);return out;}
 function decodeEnvelope(data){const bytes=data instanceof ArrayBuffer?new Uint8Array(data):new Uint8Array(data);if(bytes.length<2||bytes[0]!==VERSION)return null;if(bytes[1]!==KIND_FRAME&&bytes[1]!==KIND_INPUT)return null;return {kind:bytes[1]===KIND_FRAME?"frame":"input",payload:bytes.subarray(2)};}
 async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;ctx.drawImage(bitmap,0,0);bitmap.close();}
@@ -72,22 +45,22 @@ async function paintFrame(payload){try{await paintJpegOrPng(payload);return;}cat
 function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}setStatus("disconnected");}
 function connect(opts){
   if(opts&&typeof opts==="object"){
-    if(typeof opts.session==="string") sessionEl.value=opts.session;
-    if(typeof opts.token==="string") tokenEl.value=opts.token;
-    if(typeof opts.hop==="string") hopEl.value=opts.hop;
+    if(typeof opts.session==="string") session=opts.session;
+    if(typeof opts.token==="string") token=opts.token;
+    if(typeof opts.hop==="string") hop=opts.hop;
   }
-  const session=sessionEl.value.trim();
-  const token=tokenEl.value.trim();
-  const hop=hopEl.value.trim()||location.host;
+  session=session.trim();
+  token=token.trim();
+  hop=hop.trim();
+  const host=hop||location.host;
   if(!session||!token){setStatus("disconnected");return;}
   disconnect();
   const url=new URL(location.href);
   url.searchParams.set("session",session);
   url.searchParams.set("token",token);
-  if(hopEl.value.trim())url.searchParams.set("hop",hop);else url.searchParams.delete("hop");
-  if(embedded) url.searchParams.set("embedded","1");
+  if(hop)url.searchParams.set("hop",hop);else url.searchParams.delete("hop");
   history.replaceState(null,"",url);
-  socket=new PartySocket({host:hop,party:"session",room:session,query:{token:token,role:"browser"}});
+  socket=new PartySocket({host:host,party:"session",room:session,query:{token:token,role:"browser"}});
   socket.binaryType="arraybuffer";
   socket.addEventListener("open",()=>setStatus("waiting"));
   socket.addEventListener("close",()=>setStatus("disconnected"));
@@ -120,8 +93,6 @@ canvas.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,co
 canvas.addEventListener("keyup",(e)=>{sendInput({t:"key",e:"up",key:e.key,code:e.code});e.preventDefault();});
 vk.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,code:e.code});});
 vk.addEventListener("keyup",(e)=>{sendInput({t:"key",e:"up",key:e.key,code:e.code});});
-document.getElementById("connect").addEventListener("click",()=>connect());
-document.getElementById("disconnect").addEventListener("click",disconnect);
 window.addEventListener("message",(event)=>{
   if(event.origin!==window.location.origin) return;
   if(window.parent!==window && event.source!==window.parent) return;
@@ -165,5 +136,5 @@ window.addEventListener("message",(event)=>{
 });
 applyScale();
 setStatus("disconnected");
-if(sessionEl.value&&tokenEl.value) connect();
+if(session.trim()&&token.trim()) connect();
 </script></body></html>
