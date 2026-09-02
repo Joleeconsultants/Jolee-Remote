@@ -1847,6 +1847,7 @@ function Sidebar() {
    * input; the next touch on the stream overlay blurs it again.
    */
   const handleShowVirtualKeyboard = useCallback(() => {
+    postToCore({ type: "showVirtualKeyboard" });
     console.log("Dashboard: Directly handling virtual keyboard pop.");
     const kbdAssistInput = document.getElementById('keyboard-input-assist');
     const mainInteractionOverlay = document.getElementById('overlayInput');
@@ -4675,6 +4676,16 @@ function Sidebar() {
             )}
           </>
         )}
+        {!isViewerRole && (renderableSettings.keyboardButton ?? true) && (
+          <button
+            className={`virtual-keyboard-button theme-${theme} allow-native-input`}
+            onClick={handleShowVirtualKeyboard}
+            title={t("buttons.virtualKeyboardButtonTitle", "Keyboard")}
+            aria-label={t("buttons.virtualKeyboardButtonTitle", "Keyboard")}
+          >
+            <KeyboardIcon />
+          </button>
+        )}
       </div>
 
 
@@ -4793,26 +4804,6 @@ function Sidebar() {
 
       {isViewerRole && (
         <PlayerGamepadButton touchOnly isActive={isTouchGamepadActive} onToggle={handleToggleTouchGamepad} />
-      )}
-      {!isViewerRole && isKeyboardButtonVisible && (renderableSettings.keyboardButton ?? true) && (
-        <button
-          className={`virtual-keyboard-button theme-${theme} allow-native-input`}
-          onClick={onKeyboardButtonClick}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          style={{
-            position: 'fixed',
-            right: `${keyboardButtonPosition.right}px`,
-            bottom: `${keyboardButtonPosition.bottom}px`,
-            touchAction: 'none',
-          }}
-          title={t("buttons.virtualKeyboardButtonTitle", "Pop Keyboard")}
-          aria-label={t("buttons.virtualKeyboardButtonTitle", "Pop Keyboard")}
-        >
-          <KeyboardIcon />
-        </button>
       )}
     </>
   );

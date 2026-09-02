@@ -141,8 +141,8 @@ const en = {
         clipboard: {
             uploadImage: "Upload Image",
             title: "Clipboard",
-            label: "Server Clipboard:",
-            placeholder: "Clipboard content from server...",
+            label: "PC Clipboard:",
+            placeholder: "Clipboard content from the PC...",
             binaryModeLabel: "Image Support",
             binaryModeDetails: "Allows copying and pasting images to and from the remote session.",
         },
