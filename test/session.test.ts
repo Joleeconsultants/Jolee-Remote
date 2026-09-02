@@ -6,7 +6,8 @@ import {
   evictDurableObject,
 } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { decodeEnvelope, encodeEnvelope } from "../src/envelope";
+import { decodeEnvelope, encodeEnvelope, MAX_ENVELOPE_BYTES } from "../src/envelope";
+import { agentJoinPath, browserJoinPath, viewerPath } from "../src/joins";
 import { Session } from "../src/session";
 
 type Minted = {
@@ -28,9 +29,12 @@ async function mint(ttlSeconds = 900): Promise<Minted> {
   return (await res.json()) as Minted;
 }
 
-async function openWs(path: string): Promise<WebSocket> {
+async function openWs(
+  path: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<WebSocket> {
   const res = await SELF.fetch("https://example.com" + path, {
-    headers: { Upgrade: "websocket" },
+    headers: { Upgrade: "websocket", ...extraHeaders },
   });
   const ws = res.webSocket;
   if (!ws) {
@@ -96,7 +100,10 @@ describe("session hop", () => {
     expect(minted.browserToken).toHaveLength(64);
     expect(minted.agentToken).toHaveLength(64);
     expect(minted.browserToken).not.toBe(minted.agentToken);
-    expect(minted.joins.agent).toContain("/sessions/" + minted.sessionId + "/agent");
+    expect(minted.joins.agent).toBe(agentJoinPath(minted.sessionId, minted.agentToken));
+    expect(minted.joins.browser).toBe(
+      viewerPath(minted.sessionId, minted.browserToken, "example.com"),
+    );
 
     const statusRes = await SELF.fetch("https://example.com/sessions/" + minted.sessionId);
     expect(statusRes.status).toBe(200);
@@ -111,7 +118,7 @@ describe("session hop", () => {
 
   it("pairs one browser and one agent and echoes opaque frame and input", async () => {
     const minted = await mint();
-    const browser = await openWs(minted.joins.browser);
+    const browser = await openWs(browserJoinPath(minted.sessionId, minted.browserToken));
     const agent = await openWs(minted.joins.agent);
     await waitUntilState(minted.sessionId, "paired");
 
@@ -133,10 +140,11 @@ describe("session hop", () => {
 
   it("rejects a second browser and a second agent", async () => {
     const minted = await mint();
-    const browser = await openWs(minted.joins.browser);
+    const browserPath = browserJoinPath(minted.sessionId, minted.browserToken);
+    const browser = await openWs(browserPath);
     await waitStatus(browser, "waiting");
 
-    const secondBrowser = await SELF.fetch("https://example.com" + minted.joins.browser, {
+    const secondBrowser = await SELF.fetch("https://example.com" + browserPath, {
       headers: { Upgrade: "websocket" },
     });
     expect(secondBrowser.status).toBe(409);
@@ -164,16 +172,19 @@ describe("session hop", () => {
     const statusRes = await SELF.fetch("https://example.com/sessions/" + minted.sessionId);
     expect(statusRes.status).toBe(404);
 
-    const join = await SELF.fetch("https://example.com" + minted.joins.browser, {
-      headers: { Upgrade: "websocket" },
-    });
+    const join = await SELF.fetch(
+      "https://example.com" + browserJoinPath(minted.sessionId, minted.browserToken),
+      {
+        headers: { Upgrade: "websocket" },
+      },
+    );
     expect(join.status).toBe(404);
     expect(join.webSocket).toBeNull();
   });
 
   it("keeps connection tags across wake so frame routing still works", async () => {
     const minted = await mint();
-    const browser = await openWs(minted.joins.browser);
+    const browser = await openWs(browserJoinPath(minted.sessionId, minted.browserToken));
     const agent = await openWs(minted.joins.agent);
     await waitUntilState(minted.sessionId, "paired");
 
@@ -190,6 +201,83 @@ describe("session hop", () => {
     const toBrowser = decodeEnvelope(await waitBinary(browser));
     expect(toBrowser?.kind).toBe("frame");
     expect(Array.from(toBrowser?.payload ?? [])).toEqual([42]);
+
+    browser.close(1000, "done");
+    agent.close(1000, "done");
+  });
+
+  it("requires mint secret when configured and accepts Bearer or X-Mint-Secret", async () => {
+    const previous = env.MINT_SECRET;
+    env.MINT_SECRET = "unit-test-mint-secret";
+    try {
+      const denied = await SELF.fetch("https://example.com/sessions", { method: "POST" });
+      expect(denied.status).toBe(401);
+
+      const wrong = await SELF.fetch("https://example.com/sessions", {
+        method: "POST",
+        headers: { Authorization: "Bearer nope" },
+      });
+      expect(wrong.status).toBe(401);
+
+      const okBearer = await SELF.fetch("https://example.com/sessions", {
+        method: "POST",
+        headers: { Authorization: "Bearer unit-test-mint-secret" },
+      });
+      expect(okBearer.status).toBe(201);
+
+      const okHeader = await SELF.fetch("https://example.com/sessions", {
+        method: "POST",
+        headers: { "X-Mint-Secret": "unit-test-mint-secret" },
+      });
+      expect(okHeader.status).toBe(201);
+    } finally {
+      env.MINT_SECRET = previous;
+    }
+  });
+
+  it("joins with first-message token and query-string fallback", async () => {
+    const minted = await mint();
+    const browser = await openWs("/sessions/" + minted.sessionId + "/browser");
+    browser.send(JSON.stringify({ type: "join", token: minted.browserToken }));
+    await waitStatus(browser, "waiting");
+
+    const agent = await openWs(minted.joins.agent);
+    await waitUntilState(minted.sessionId, "paired");
+
+    const frame = encodeEnvelope("frame", new Uint8Array([7]));
+    agent.send(frame);
+    const toBrowser = decodeEnvelope(await waitBinary(browser));
+    expect(Array.from(toBrowser?.payload ?? [])).toEqual([7]);
+
+    browser.close(1000, "done");
+    agent.close(1000, "done");
+  });
+
+  it("joins agent with Authorization Bearer and no query token", async () => {
+    const minted = await mint();
+    const browser = await openWs(browserJoinPath(minted.sessionId, minted.browserToken));
+    const agent = await openWs("/sessions/" + minted.sessionId + "/agent", {
+      Authorization: "Bearer " + minted.agentToken,
+    });
+    await waitUntilState(minted.sessionId, "paired");
+    browser.close(1000, "done");
+    agent.close(1000, "done");
+  });
+
+  it("drops oversize envelopes and still forwards a later in-cap frame", async () => {
+    const minted = await mint();
+    const browser = await openWs(browserJoinPath(minted.sessionId, minted.browserToken));
+    const agent = await openWs(minted.joins.agent);
+    await waitUntilState(minted.sessionId, "paired");
+
+    const oversize = encodeEnvelope("frame", new Uint8Array(MAX_ENVELOPE_BYTES));
+    expect(oversize.byteLength).toBeGreaterThan(MAX_ENVELOPE_BYTES);
+    agent.send(oversize);
+    const small = encodeEnvelope("frame", new Uint8Array([3, 3, 3]));
+    agent.send(small);
+    const toBrowser = decodeEnvelope(await waitBinary(browser));
+    expect(toBrowser?.kind).toBe("frame");
+    expect(Array.from(toBrowser?.payload ?? [])).toEqual([3, 3, 3]);
 
     browser.close(1000, "done");
     agent.close(1000, "done");

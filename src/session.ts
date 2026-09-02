@@ -1,5 +1,5 @@
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
-import { decodeEnvelope } from "./envelope";
+import { decodeEnvelope, envelopeByteLength, MAX_ENVELOPE_BYTES } from "./envelope";
 import { timingSafeEqual } from "./tokens";
 import {
   DEFAULT_TTL_SECONDS,
@@ -11,6 +11,7 @@ import {
 export type Env = {
   Session: DurableObjectNamespace<Session>;
   ASSETS?: Fetcher;
+  MINT_SECRET?: string;
 };
 
 type SessionRow = {
@@ -24,7 +25,7 @@ type SessionRow = {
 
 type Role = "browser" | "agent";
 
-type ConnState = { role: Role };
+type ConnState = { role: Role; joined: boolean };
 
 export class Session extends Server<Env> {
   static options = { hibernate: true };
@@ -107,13 +108,22 @@ export class Session extends Server<Env> {
     }
     // Use serializeAttachment, not setState: PartyServer's setState overwrites
     // the socket attachment and drops the __pk metadata hibernation needs.
-    connection.serializeAttachment({ role });
-    this.persistPairState();
-    this.broadcastStatus();
+    const token = tokenFromRequest(ctx.request);
+    const joined = Boolean(token);
+    connection.serializeAttachment({ role, joined });
+    if (joined) {
+      this.persistPairState();
+      this.broadcastStatus();
+    }
   }
 
   async onMessage(connection: Connection<ConnState>, message: WSMessage): Promise<void> {
-    if (typeof message === "string") return;
+    if (typeof message === "string") {
+      this.handleJoin(connection, message);
+      return;
+    }
+    if (!this.isJoined(connection)) return;
+    if (envelopeByteLength(message) > MAX_ENVELOPE_BYTES) return;
     const decoded = decodeEnvelope(message as ArrayBuffer | ArrayBufferView);
     if (!decoded) return;
     const row = this.loadRow();
@@ -126,21 +136,25 @@ export class Session extends Server<Env> {
 
     const target: Role = decoded.kind === "frame" ? "browser" : "agent";
     for (const peer of this.getConnections<ConnState>(target)) {
-      if (peer.id !== connection.id) peer.send(message);
+      if (peer.id === connection.id) continue;
+      if (!this.isJoined(peer)) continue;
+      peer.send(message);
     }
   }
 
-  async onClose(_connection: Connection): Promise<void> {
+  async onClose(connection: Connection<ConnState>): Promise<void> {
     if (this.tearingDown) return;
     const row = this.loadRow();
     if (!row) return;
+    if (!this.isJoined(connection)) return;
     await this.teardown();
   }
 
-  async onError(_connection: Connection, _error: unknown): Promise<void> {
+  async onError(connection: Connection<ConnState>, _error: unknown): Promise<void> {
     if (this.tearingDown) return;
     const row = this.loadRow();
     if (!row) return;
+    if (!this.isJoined(connection)) return;
     await this.teardown();
   }
 
@@ -148,6 +162,47 @@ export class Session extends Server<Env> {
     const row = this.loadRow();
     if (!row) return;
     await this.teardown();
+  }
+
+  private handleJoin(connection: Connection<ConnState>, message: string): void {
+    if (this.isJoined(connection)) return;
+    let parsed: { type?: unknown; token?: unknown };
+    try {
+      parsed = JSON.parse(message) as { type?: unknown; token?: unknown };
+    } catch {
+      connection.close(4001, "join required");
+      return;
+    }
+    if (parsed.type !== "join" || typeof parsed.token !== "string" || !parsed.token) {
+      connection.close(4001, "join required");
+      return;
+    }
+    const role = this.roleOf(connection);
+    if (!role) {
+      connection.close(4002, "invalid role");
+      return;
+    }
+    const row = this.loadRow();
+    if (!row || row.state === "ended") {
+      connection.close(4004, "session not found");
+      return;
+    }
+    if (Date.now() >= row.expires_at) {
+      connection.close(4010, "session expired");
+      return;
+    }
+    const expected = role === "browser" ? row.browser_token : row.agent_token;
+    if (!timingSafeEqual(parsed.token, expected)) {
+      connection.close(4003, "invalid token");
+      return;
+    }
+    if (this.hasRole(role)) {
+      connection.close(4009, "already connected");
+      return;
+    }
+    connection.serializeAttachment({ role, joined: true });
+    this.persistPairState();
+    this.broadcastStatus();
   }
 
   private denyJoin(request: Request): Response | null {
@@ -161,28 +216,49 @@ export class Session extends Server<Env> {
     const role = roleFromRequest(request);
     const token = tokenFromRequest(request);
     if (!role) return jsonError("role required", 400);
-    if (!token) return jsonError("token required", 401);
+    if (this.hasRole(role)) {
+      return jsonError(role + " already connected", 409);
+    }
+    if (!token) {
+      // First text message `{type:"join","token"}` authenticates after upgrade.
+      return null;
+    }
     const expected = role === "browser" ? row.browser_token : row.agent_token;
     if (!timingSafeEqual(token, expected)) {
       return jsonError("invalid token", 403);
-    }
-    if (this.hasRole(role)) {
-      return jsonError(role + " already connected", 409);
     }
     return null;
   }
 
   private roleOf(connection: Connection<ConnState>): Role | null {
-    const fromState = connection.state?.role;
-    if (fromState === "browser" || fromState === "agent") return fromState;
+    const attached = this.connState(connection);
+    if (attached?.role === "browser" || attached?.role === "agent") return attached.role;
     if (connection.tags.includes("browser")) return "browser";
     if (connection.tags.includes("agent")) return "agent";
     return null;
   }
 
+  private isJoined(connection: Connection<ConnState>): boolean {
+    const attached = this.connState(connection);
+    if (attached && typeof attached.joined === "boolean") return attached.joined;
+    return true;
+  }
+
+  private connState(connection: Connection<ConnState>): ConnState | null {
+    const fromState = connection.state;
+    if (fromState?.role === "browser" || fromState?.role === "agent") return fromState;
+    try {
+      const attached = connection.deserializeAttachment() as ConnState | null;
+      if (attached?.role === "browser" || attached?.role === "agent") return attached;
+    } catch {
+      // no attachment
+    }
+    return null;
+  }
+
   private hasRole(role: Role): boolean {
-    for (const _conn of this.getConnections(role)) {
-      return true;
+    for (const conn of this.getConnections<ConnState>(role)) {
+      if (this.isJoined(conn)) return true;
     }
     return false;
   }

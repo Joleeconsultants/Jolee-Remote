@@ -17,7 +17,7 @@ Example consumer: an agent you already have (for example a LetLeeIn-style agent)
 
 ```mermaid
 flowchart LR
-  Browser[Browser viewer] --> Worker[Worker]
+  Browser[Selkies chrome] --> Worker[Worker]
   Worker --> DO[Session Durable Object]
   Agent[Outbound agent] -->|any WebSocket client| DO
 ```
@@ -31,10 +31,10 @@ sequenceDiagram
   participant Session
   participant Browser
   participant Agent
-  App->>Worker: POST /sessions
+  App->>Worker: POST /sessions with mint secret
   Worker->>Session: mint id + join tokens + TTL
-  Worker-->>App: sessionId, browserToken, agentToken
-  Browser->>Session: WS join as browser + token
+  Worker-->>App: sessionId, browserToken, agentToken, joins
+  Browser->>Session: open Selkies join URL
   Agent->>Session: outbound WS join as agent + token
   Session-->>Browser: status paired
   Session-->>Agent: status paired
@@ -54,52 +54,64 @@ The hop does not interpret pixels or OS events. Every binary WebSocket message i
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | version (`0x01`) |
-| 1 | 1 | kind: `0x01` frame (agent to browser), `0x02` input (browser to agent) |
+| 1 | 1 | kind: `0x01` frame (agent to browser, JPEG/WebP), `0x02` input (browser to agent, JSON opaque) |
 | 2.. | n | opaque payload |
 
 Malformed envelopes are dropped. Frames are forwarded only from the agent connection to the browser connection. Input is forwarded only from the browser connection to the agent connection. Pairing must be complete before bytes flow.
+
+Cloudflare Durable Objects accept received WebSocket messages up to **32 MiB** ([limits](https://developers.cloudflare.com/durable-objects/platform/limits/)). This hop drops envelopes larger than **1 MiB** (`MAX_ENVELOPE_BYTES`) so JPEG/WebP stills at low fps stay inside a conservative cap.
 
 Text WebSocket messages are control JSON from the Durable Object, not the envelope:
 
 `{"type":"status","sessionId":"...","state":"waiting|paired|expired","expiresAt":0,"browserConnected":true,"agentConnected":true}`
 
-Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `input`, e.g. `{ "t": "pointer", "e": "move", "x": 0.5, "y": 0.5 }`. Frame payload is typically a JPEG/PNG/WebP image or an H.264 access unit — the viewer paints with `createImageBitmap` / `drawImage` or `VideoDecoder`.
+A connecting peer may send `{"type":"join","token":"..."}` as its first text message instead of putting the token in the query string.
+
+Suggested viewer payload (still opaque to the hop): JSON UTF-8 inside kind `input`, e.g. `{ "t": "pointer", "e": "move", "x": 0.5, "y": 0.5 }`. Frame payload is typically a JPEG/WebP still — the viewer paints with `createImageBitmap` / `drawImage`.
 
 ## HTTP and WebSocket
 
-- `POST /sessions` optional JSON `{ "ttlSeconds": 900 }` (1..3600, default 900). Returns `sessionId`, `browserToken`, `agentToken`, `expiresAt`, `joins`.
+- `POST /sessions` optional JSON `{ "ttlSeconds": 900 }` (1..3600, default 900). **Production requires `MINT_SECRET`**: send `Authorization: Bearer <MINT_SECRET>` or `X-Mint-Secret`. Unset in local `wrangler dev` keeps open mint. Returns `sessionId`, `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, `joins`.
 - `GET /sessions/:id` public status. Does **not** return tokens.
-- Browser join (any WS client, or PartySocket): `GET /sessions/:id/browser?token=...` with `Upgrade: websocket`.
-- Agent join (any WS client; do not require PartySocket): `GET /sessions/:id/agent?token=...` with `Upgrade: websocket`.
-- PartySocket path used by the viewer: `/parties/session/:id?role=browser&token=...` (`partyserver` room named with the session id).
+- **Browser join (the product URL):** `/?session=<id>&token=<browserToken>&hop=<worker-origin>` opens Selkies chrome. `joins.browser` is this path. See [docs/chrome.md](docs/chrome.md).
+- Agent join (any WS client; do not require PartySocket): `wss://<hop>/sessions/<id>/agent?token=` still works as fallback (`joins.agent`). Prefer first text message `{"type":"join","token":"..."}` or `Authorization: Bearer` on the upgrade. Query string remains fallback.
+- PartySocket path is how the canvas hole (`/viewer.html`) implements the browser socket, not a second product join: `/parties/session/:id?role=browser&token=...`.
 
-Auth in this repo is the mint-time join token only. No tenants, device directory, portal, or fleet agent.
+Auth in this repo is the mint secret plus mint-time join tokens. No tenants, device directory, portal, or fleet agent. 1:1 pairing; N browsers is a later consumer need.
 
 ## Building the agent
 
+Consumer plug-in checklist (mint secret, Selkies join URL, envelope, token paths): [docs/agent.md](docs/agent.md).
+
 The agent is a WebSocket **client**.
 
-1. Your app calls `POST /sessions` (or you mint out of band) and receives `sessionId` + `agentToken`.
+1. Your app calls `POST /sessions` with the mint secret and receives `sessionId` + `agentToken`. Open the browser at `joins.browser` (`/?session=&token=&hop=`).
 2. Connect outbound:
 
    `wss://<worker-host>/sessions/<sessionId>/agent?token=<agentToken>`
 
-   Header `Authorization: Bearer <agentToken>` is also accepted. Any WebSocket client works.
+   Better: omit the query token and send `{"type":"join","token":"<agentToken>"}` as the first text message, or `Authorization: Bearer <agentToken>` on the upgrade. Query string is fallback. Any WebSocket client works.
 3. Wait until you see a `status` message with `state: "paired"` (browser is in).
-4. Send binary envelopes with kind `frame` and your capture bytes. Read kind `input` payloads and apply them on the device.
+4. Send binary envelopes with kind `frame` (`0x01`) and JPEG/WebP stills under 1 MiB. Read kind `input` (`0x02`) JSON payloads and apply them on the device.
 5. If the browser drops, the session ends. If TTL fires, the session ends. Later joins are rejected.
 
-Rejects: second browser or second agent (`409`). Expired (`410`). Unknown session (`404`). Bad token (`403`).
+Rejects: mint `401` without secret when configured. Second browser or second agent (`409`). Expired (`410`). Unknown session (`404`). Bad token (`403`).
 
 Hibernation: the session class extends `partyserver` `Server` with `static options = { hibernate: true }`. Connections are tagged `browser` / `agent` via `getConnectionTags`. After wake, tags are restored by the platform; the DO routes using those tags. One Durable Object alarm is the TTL.
 
 ## Product UI
 
-`/` is the product UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page.
+The one browser join URL is:
 
-`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket + envelope + paint + input + postMessage. No header, no Connect button, no status pill.
+```
+/?session=<id>&token=<browserToken>&hop=<worker-origin>
+```
 
-Join with query params on `/`: `session`, `token` (browser join token), `hop` (Worker host, default this origin). The shell copies those onto the hop-core iframe, which auto-connects. A host app can also postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the iframe. The core posts status `waiting` | `paired` | `expired` | `disconnected`. The browser WebSocket uses **PartySocket**. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
+That opens **Selkies chrome** (modified dashboard, MPL-2.0) as the product session UI. There is no custom join page. `viewerPath` in `src/joins.ts` builds this URL.
+
+`/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket + envelope + paint + input + postMessage. No header, no Connect button, no status pill. Do not tell consumers to replace Selkies with a custom page.
+
+The shell copies those query params onto the hop-core iframe, which auto-connects. A host app can also postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the iframe. The core posts status `waiting` | `paired` | `expired` | `disconnected`. The browser WebSocket uses **PartySocket** as the hole implementation. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
 
 ## Tiny sample client
 
@@ -107,13 +119,13 @@ Join with query params on `/`: `session`, `token` (browser join token), `hop` (W
 node examples/agent.mjs <sessionId> <agentToken> [ws://127.0.0.1:8787]
 ```
 
-Outbound-connects as the agent, sends placeholder PNG frames, prints input. Proves the pipe.
+Outbound-connects as the agent, sends placeholder PNG frames, prints input. Proves the pipe. Not a real capture agent.
 
 ## Develop
 
 Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`), `build:dashboard`, `sync:dashboard`. Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
 
-
+Local `wrangler dev` leaves `MINT_SECRET` unset (open mint). Production: set Worker secret `MINT_SECRET`.
 ## Keeping chrome in sync
 
 This repo does not run Selkies and does not copy selkies-web-core. Dashboard chrome is a modified vendored copy of `addons/selkies-dashboard`.
