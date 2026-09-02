@@ -15,5 +15,8 @@
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": true
+  },
+  "vars": {
+    "MINT_SECRET": ""
   }
 }

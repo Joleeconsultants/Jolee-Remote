@@ -1,6 +1,6 @@
 # Dashboard chrome
 
-`/` is the product UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page.
+`/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. There is no custom join page. Do not replace Selkies with a custom page.
 
 `/viewer.html` is **not** a viewer product. It is a canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
 
@@ -10,7 +10,11 @@ Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`
 
 ## Join
 
-Join with query params on `/`:
+The one browser join URL opens Selkies chrome:
+
+```
+/?session=<id>&token=<browserToken>&hop=<worker-origin>
+```
 
 | param | meaning |
 | --- | --- |
@@ -18,7 +22,8 @@ Join with query params on `/`:
 | `token` | browser join token |
 | `hop` | Worker host; default this origin |
 
-`public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
+`joins.browser` from mint is this path (`viewerPath` in `src/joins.ts`). `public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
+
 
 ## postMessage contract
 

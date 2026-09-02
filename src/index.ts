@@ -7,7 +7,8 @@ import {
   MIN_TTL_SECONDS,
   type MintResponse,
 } from "./types";
-import { agentJoinPath, browserJoinPath } from "./joins";
+import { agentJoinPath, viewerPath } from "./joins";
+import { authorizeMint } from "./mint-auth";
 
 export { Session };
 export {
@@ -21,7 +22,7 @@ export {
 const CORS: Record<string, string> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "content-type, authorization",
+  "access-control-allow-headers": "content-type, authorization, x-mint-secret",
 };
 
 export default {
@@ -61,6 +62,10 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function mint(request: Request, env: Env): Promise<Response> {
+  if (!authorizeMint(request, env.MINT_SECRET)) {
+    return json({ error: "mint secret required" }, 401);
+  }
+
   let ttlSeconds = DEFAULT_TTL_SECONDS;
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
@@ -79,6 +84,7 @@ async function mint(request: Request, env: Env): Promise<Response> {
   const sessionId = crypto.randomUUID();
   const browserToken = randomToken();
   const agentToken = randomToken();
+  const hop = new URL(request.url).host;
   const stub = env.Session.getByName(sessionId);
   try {
     const minted = await stub.mint({
@@ -94,7 +100,7 @@ async function mint(request: Request, env: Env): Promise<Response> {
       expiresAt: minted.expiresAt,
       ttlSeconds: minted.ttlSeconds,
       joins: {
-        browser: browserJoinPath(minted.sessionId, browserToken),
+        browser: viewerPath(minted.sessionId, browserToken, hop),
         agent: agentJoinPath(minted.sessionId, agentToken),
       },
     };

@@ -1,6 +1,12 @@
 /**
- * Join URL builders for hop consumers (outbound agent, viewer, portal).
- * Relative paths match POST /sessions `joins` and the Worker routes.
+ * Join URL builders for hop consumers.
+ *
+ * Product browser join is Selkies chrome: `viewerPath` → `/?session=&token=&hop=`.
+ * That is POST /sessions `joins.browser`. `/viewer.html` is the canvas hole the
+ * chrome iframes — not a second product join.
+ *
+ * `browserJoinPath` / `agentJoinPath` are WebSocket routes (query token fallback).
+ * PartySocket `partyBrowserPath` is how the canvas hole connects, not a product URL.
  */
 
 export function browserJoinPath(sessionId: string, token: string): string {
@@ -21,7 +27,7 @@ export function partyBrowserPath(sessionId: string, token: string): string {
   );
 }
 
-/** Query string for `/?session=&token=&hop=` (token is browserToken). */
+/** Query string for Selkies chrome `/?session=&token=&hop=` (token is browserToken). */
 export function viewerQuery(
   sessionId: string,
   token: string,
@@ -34,6 +40,7 @@ export function viewerQuery(
   return params.toString();
 }
 
+/** Product browser join URL: opens Selkies chrome over the canvas hole. */
 export function viewerPath(
   sessionId: string,
   token: string,

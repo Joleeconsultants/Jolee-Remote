@@ -1,34 +1,56 @@
 # Consumer plug-in checklist
 
-You already have an agent (outbound WebSocket client, capture, input) and a page that can open a viewer. This hop mints a short-lived session, pairs exactly one browser socket with exactly one agent socket, and forwards opaque `frame` / `input` bytes. Do not reverse-engineer `src/` for the join contract: mint, paths, envelope, and rejects are below. Helpers live in `src/joins.ts`.
+Your Worker mints a hop session, stores the ids, hands the outbound agent a join URL + token, and opens **Selkies chrome** as the session UI. This hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. No RFB. N browsers is a later consumer need, not this version.
 
-Auth, device directory, capture format, applying input, and the portal stay with the consumer.
+Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join). Do not reverse-engineer `src/` for the contract below.
 
 ## Mint
 
-`POST /sessions` with optional JSON `{ "ttlSeconds": 900 }` (clamped 1..3600, default 900).
+Consumer Worker: `POST /sessions` with optional JSON `{ "ttlSeconds": 900 }` (clamped 1..3600, default 900).
 
-Returns `sessionId`, `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, and `joins` (relative browser and agent paths).
+**Production requires a mint secret.** Set Worker env `MINT_SECRET` and send it as:
 
-## Join
+- `Authorization: Bearer <MINT_SECRET>`, or
+- `X-Mint-Secret: <MINT_SECRET>`
 
-Browser WebSocket (any WS client, or PartySocket):
+Missing or wrong secret → `401`. Local `wrangler dev` with `MINT_SECRET` unset keeps open mint so you can iterate without a secret; production must set one (`wrangler secret put MINT_SECRET`).
 
-- `/sessions/:id/browser?token=` (`browserJoinPath`)
-- PartySocket: `/parties/session/:id?role=browser&token=` (`partyBrowserPath`)
+Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, and `joins`:
 
-Agent WebSocket (any WS client; do not require PartySocket):
+- `joins.browser` — Selkies chrome: `/?session=<id>&token=<browserToken>&hop=<worker-host>`
+- `joins.agent` — agent WebSocket path with query-token fallback
 
-- `/sessions/:id/agent?token=` (`agentJoinPath`)
-- `Authorization: Bearer <agentToken>` is also accepted
+## Open the session (browser)
+
+The one browser join URL is:
+
+```
+/?session=<id>&token=<browserToken>&hop=<worker-origin>
+```
+
+That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form, e.g. `127.0.0.1:8787`). Built by `viewerPath` / `viewerQuery`.
+
+`/viewer.html` is the canvas hole the chrome iframes. Do not replace Selkies with a custom page. PartySocket `/parties/session/:id?role=browser&token=` is how that hole connects, not a second product join.
+
+## Agent join
+
+Hand the agent `sessionId` plus the agent URL and token. Any WebSocket client (do not require PartySocket):
+
+```
+wss://<hop>/sessions/<id>/agent?token=<agentToken>
+```
+
+Token paths (query is fallback):
+
+1. First text message after upgrade: `{"type":"join","token":"<agentToken>"}` on `wss://<hop>/sessions/<id>/agent`
+2. `Authorization: Bearer <agentToken>` on the WebSocket upgrade
+3. Query string `?token=` (fallback; still what `joins.agent` returns)
 
 The agent is the WebSocket **client**. The session Durable Object is the WebSocket **server** and may hibernate. The DO never dials out.
 
-`src/joins.ts` builds these paths (and the viewer query) so mint `joins` and consumers stay in sync.
-
 ## Pairing
 
-Wait for a **text** JSON control message with `type: "status"` and `state: "paired"` before sending frames. Binary envelopes sent before both peers are in are dropped.
+Wait for a **text** JSON control message with `type: "status"` and `state: "paired"` before sending frames. Binary envelopes sent before both peers are in are dropped. 1:1 pairing only.
 
 Shape:
 
@@ -41,32 +63,31 @@ Every binary WebSocket message:
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | version (`0x01`) |
-| 1 | 1 | kind: `0x01` frame (agent → browser), `0x02` input (browser → agent) |
+| 1 | 1 | kind: `0x01` frame (agent → browser, JPEG/WebP stills), `0x02` input (browser → agent, JSON opaque) |
 | 2.. | n | opaque payload |
 
-Malformed envelopes are dropped. Frames only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are already in `src/envelope.ts`. The hop does not interpret pixels or OS events.
+No RFB. The hop does not interpret pixels or OS events. Malformed envelopes are dropped. Frames only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are in `src/envelope.ts`.
 
-## Viewer
+### Max binary message size
 
-- `/?session=&token=&hop=` — `token` is `browserToken`. `hop` is the Worker host (default this origin). Built by `viewerQuery` / `viewerPath`.
-- `/viewer.html` is the canvas hole (PartySocket + envelope + paint + input). Not a product UI.
-- A host app can postMessage `connect` / `disconnect` (plus `requestFullscreen`, `setScaleLocally`, `showVirtualKeyboard`, `clipboardUpdateFromUI`) to the hop-core iframe. Contract: [chrome.md](chrome.md).
+Cloudflare Durable Objects accept received WebSocket messages up to **32 MiB** ([platform limits](https://developers.cloudflare.com/durable-objects/platform/limits/)). This hop drops envelopes larger than **1 MiB** (`MAX_ENVELOPE_BYTES = 1048576`) so JPEG/WebP stills at low fps stay inside a conservative cap. Oversize frames are not forwarded; the session stays up.
 
 ## Rejects and teardown
 
-- `403` bad token
+- `401` mint secret missing/wrong (when `MINT_SECRET` is configured)
+- `403` bad join token (upgrade with query or `Authorization`)
 - `404` unknown session
 - `409` second peer (second browser or second agent)
 - `410` expired
 
-TTL alarm or either peer dropping ends the session. Later joins are rejected.
+First-message join failures close the socket (`4003` invalid token, `4009` role already connected) instead of an HTTP status.
+
+TTL alarm or either **joined** peer dropping ends the session. Later joins are rejected. A socket that never sent a join token does not tear the session down.
 
 ## What stays with the consumer
 
-- Auth beyond mint-time join tokens
-- Devices / identity
-- Capture format and encoding
-- Applying input on the device
-- Portal / product chrome around the canvas hole
-
-This repo is the hop, not a remote-desktop product.
+- Anything beyond the mint secret and join tokens (users, tenants, Access)
+- Devices / identity / fleet agent
+- Capture encoding (JPEG/WebP stills recommended)
+- Applying opaque input JSON on the device
+- Product chrome around Selkies is already this repo's `/`; do not iframe-replace it
