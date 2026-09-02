@@ -1,4 +1,6 @@
 # Jolee overlay — never overwritten by scripts/sync-selkies-dashboard.sh
+# Hide-flags for unused Selkies chrome live in src/jolee-settings.js so
+# Sidebar patches stay small. See chrome/patches/selkies-dashboard/README.md.
 NOTICE
 README.md
 LICENSE

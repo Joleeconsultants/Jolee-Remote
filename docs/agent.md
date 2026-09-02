@@ -104,6 +104,18 @@ Every binary WebSocket message:
 
 No RFB. The hop does not interpret pixels or OS events. Malformed envelopes are dropped. Frames only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are in `src/envelope.ts`.
 
+### Applying input (viewer JSON)
+
+The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSON in kind `input`. Honor these shapes on the device:
+
+- `{t:"pointer", e, x, y, b}` — `e` is `move` / `down` / `up`; `x`/`y` are 0–1
+- `{t:"key", e, key, code}` — `e` is `down` / `up`
+- `{t:"clipboard", text}` — browser → agent (sidebar PC Clipboard)
+
+To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}` (not an image). The hop does not parse it; the viewer does, then posts `clipboardContentUpdate` to the parent.
+
+Do not invent extra envelope kinds. Frames stay agent → browser. Input stays browser → agent.
+
 ### Max binary message size
 
 Cloudflare Durable Objects accept received WebSocket messages up to **32 MiB** ([platform limits](https://developers.cloudflare.com/durable-objects/platform/limits/)). This hop drops envelopes larger than **1 MiB** (`MAX_ENVELOPE_BYTES = 1048576`) so JPEG/WebP stills at low fps stay inside a conservative cap. Oversize frames are not forwarded; the session stays up.

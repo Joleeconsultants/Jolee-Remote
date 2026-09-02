@@ -6,8 +6,10 @@
 
 /**
  * Fake serverSettings payload posted to the vendored sidebar so Selkies-only
- * panels (apps, files, sharing, encoder, dual-mode) stay hidden. The hop has
- * no pixelflux/proot pipeline.
+ * panels stay hidden. The hop has no pixelflux/proot pipeline. Prefer this
+ * overlay file for hide-flags so Sidebar patches stay small.
+ * Locked settings make isRenderable return false (or hide the manual
+ * resolution block via serverSettings.manual_resolution.locked).
  */
 function flag(value) {
   return { value };
@@ -40,12 +42,19 @@ export const JOLEE_SERVER_SETTINGS = {
   enable_player3: flag(false),
   enable_player4: flag(false),
   enable_dual_mode: flag(false),
-  enable_binary_clipboard: flag(false),
+  enable_binary_clipboard: { value: false, locked: true },
   enable_rate_control: flag(false),
   audio_enabled: { value: false, locked: true },
   microphone_enabled: { value: false, locked: true },
   webcam_enabled: { value: false, locked: true },
   gamepad_enabled: { value: false, locked: true },
+  // Hop pointer is already 0–1; CSS scaling / HiDPI is unused.
+  use_css_scaling: { value: true, locked: true },
+  force_aligned_resolution: { value: false, locked: true },
+  // Hop cannot apply OS DPI; do not ship the 96..288 dropdown.
+  scaling_dpi: { value: "96", locked: true },
+  // Capture size is agent-side; the hop canvas does not resize.
+  manual_resolution: { value: false, locked: true },
   file_transfers: { value: "" },
 };
 

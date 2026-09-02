@@ -29,9 +29,13 @@ const hashParams=new URLSearchParams((location.hash||"").replace(/^#/, ""));
 let session=params.get("session")||"";
 let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
-let socket=null, videoDecoder=null, scaleLocally=true;
+let socket=null, videoDecoder=null, scaleLocally=true, antiAliasing=true;
 function applyScale(){
   canvas.classList.toggle("stretch", !scaleLocally);
+}
+function applySmoothing(){
+  ctx.imageSmoothingEnabled=!!antiAliasing;
+  ctx.imageSmoothingQuality=antiAliasing?"high":"low";
 }
 function setStatus(state){
   if(window.parent!==window){
@@ -40,8 +44,18 @@ function setStatus(state){
 }
 function encodeInput(payload){const body=new TextEncoder().encode(JSON.stringify(payload));const out=new Uint8Array(2+body.length);out[0]=VERSION;out[1]=KIND_INPUT;out.set(body,2);return out;}
 function decodeEnvelope(data){const bytes=data instanceof ArrayBuffer?new Uint8Array(data):new Uint8Array(data);if(bytes.length<2||bytes[0]!==VERSION)return null;if(bytes[1]!==KIND_FRAME&&bytes[1]!==KIND_INPUT)return null;return {kind:bytes[1]===KIND_FRAME?"frame":"input",payload:bytes.subarray(2)};}
-async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;ctx.drawImage(bitmap,0,0);bitmap.close();}
-async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
+function clipboardTextFromFrame(payload){
+  try{
+    let i=0;
+    while(i<payload.length&&(payload[i]===0x20||payload[i]===0x09||payload[i]===0x0a||payload[i]===0x0d)) i++;
+    if(i>=payload.length||payload[i]!==0x7b) return null;
+    const obj=JSON.parse(new TextDecoder().decode(payload));
+    if(obj&&typeof obj==="object"&&(obj.t==="clipboard"||obj.type==="clipboard")&&typeof obj.text==="string") return obj.text;
+  }catch(e){}
+  return null;
+}
+async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;applySmoothing();ctx.drawImage(bitmap,0,0);bitmap.close();}
+async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;applySmoothing();ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
 async function paintFrame(payload){try{await paintJpegOrPng(payload);return;}catch(e){}try{await paintH264(payload);}catch(e){ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#888";ctx.fillText("opaque frame "+payload.length+" bytes",16,24);}}
 function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}setStatus("disconnected");}
 function connect(opts){
@@ -72,7 +86,15 @@ function connect(opts){
       return;
     }
     const env=decodeEnvelope(ev.data);
-    if(env&&env.kind==="frame")paintFrame(env.payload);
+    if(!(env&&env.kind==="frame")) return;
+    const clip=clipboardTextFromFrame(env.payload);
+    if(clip!==null){
+      if(window.parent!==window){
+        window.parent.postMessage({type:"clipboardContentUpdate",text:clip}, window.location.origin);
+      }
+      return;
+    }
+    paintFrame(env.payload);
   });
 }
 function sendInput(payload){if(!socket||socket.readyState!==1)return;socket.send(encodeInput(payload));}
@@ -110,14 +132,23 @@ window.addEventListener("message",(event)=>{
       break;
     case "showVirtualKeyboard": showVirtualKeyboard(); break;
     case "clipboardUpdateFromUI": clipboardUpdateFromUI(msg.text); break;
-    // Selkies-only pipeline toggles do not apply to this hop: no encoder, audio, or command shell.
+    case "assistKey":
+      sendInput({t:"key",e:msg.e==="up"?"up":"down",key:msg.key,code:msg.code});
+      break;
+    case "setAntiAliasing":
+      antiAliasing=!!msg.value;
+      applySmoothing();
+      break;
+    case "setUseBrowserCursors":
+      canvas.style.cursor=msg.value?"default":"none";
+      break;
+    // Hidden Selkies chrome: encoder, audio, gamepad, capture resize, image clipboard.
     case "pipelineControl":
     case "settings":
     case "gamepadControl":
     case "setManualResolution":
     case "resetResolutionToWindow":
     case "setUseCssScaling":
-    case "setAntiAliasing":
     case "audioDeviceSelected":
     case "requestGamingMode":
     case "command":
@@ -129,7 +160,6 @@ window.addEventListener("message",(event)=>{
     case "touchinput:touch":
     case "setSynth":
     case "clipboardImageUpdate":
-    case "setUseBrowserCursors":
     case "mode":
       break;
     default:
@@ -137,6 +167,7 @@ window.addEventListener("message",(event)=>{
   }
 });
 applyScale();
+applySmoothing();
 setStatus("disconnected");
 if(session.trim()&&token.trim()) connect();
 </script></body></html>

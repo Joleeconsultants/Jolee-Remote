@@ -18,3 +18,8 @@ dashboard.
 
 The hop (src/, examples/, test/, wrangler, public/viewer.html, public/index.html)
 remains MIT. See the repository root LICENSE.
+
+Hide unused chrome in src/jolee-settings.js (this overlay), not with large
+Sidebar patches. The quilt in chrome/patches/selkies-dashboard/ rewires
+postMessage onto the hop and hides controls the hop cannot drive. See
+chrome/patches/selkies-dashboard/README.md.

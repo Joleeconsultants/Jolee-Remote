@@ -5,6 +5,8 @@ export const HANDLED_DASHBOARD_TYPES = [
   "setScaleLocally",
   "showVirtualKeyboard",
   "clipboardUpdateFromUI",
+  "setAntiAliasing",
+  "setUseBrowserCursors",
 ] as const;
 
 export const NOOP_DASHBOARD_TYPES = [
@@ -14,7 +16,6 @@ export const NOOP_DASHBOARD_TYPES = [
   "setManualResolution",
   "resetResolutionToWindow",
   "setUseCssScaling",
-  "setAntiAliasing",
   "audioDeviceSelected",
   "requestGamingMode",
   "command",
@@ -26,7 +27,6 @@ export const NOOP_DASHBOARD_TYPES = [
   "touchinput:touch",
   "setSynth",
   "clipboardImageUpdate",
-  "setUseBrowserCursors",
   "mode",
 ] as const;
 
@@ -37,6 +37,8 @@ export type DashboardAction =
   | "setScaleLocally"
   | "showVirtualKeyboard"
   | "clipboardUpdateFromUI"
+  | "setAntiAliasing"
+  | "setUseBrowserCursors"
   | "noop"
   | "ignore";
 

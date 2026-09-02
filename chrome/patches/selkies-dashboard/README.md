@@ -1,0 +1,46 @@
+# Selkies dashboard patches
+
+Quilt-style series applied by `scripts/sync-selkies-dashboard.sh` after copying upstream `addons/selkies-dashboard`.
+
+The series exists to rewire Selkies chrome onto the hop canvas **and to hide controls the hop cannot drive**. That hide-unused rule is the point. Do not add patches that put encoder, audio, files, sharing, gamepads, HiDPI, UI scaling, manual resolution, or image clipboard back.
+
+## Hide unused UI
+
+Only keep sidebar controls the hop can actually act on. Prefer overlay `chrome/selkies-dashboard/src/jolee-settings.js` for hide-flags (`locked: true` / `ui_sidebar_show_*: false`) so Sidebar diffs stay small.
+
+**Visible**
+
+- Screen: scale locally, anti-aliasing, CSS cursors
+- PC Clipboard (open by default, text only)
+- Fullscreen and theme
+- Mobile/touch keyboard FAB (original Selkies; not in the sidebar)
+
+**Hidden / locked**
+
+- Sharing, gamepads, encoder/video, audio, files, apps, stats, shortcuts, gaming mode, trackpad, webcam
+- HiDPI (`use_css_scaling`)
+- Force aligned resolution
+- UI scaling / OS DPI
+- Manual and preset resolution (capture size is agent-side; the hop canvas does not resize)
+- Image / binary clipboard
+
+If a control cannot change the canvas or send hop input the viewer honors, it does not belong in the chrome.
+
+## Overlay vs patches
+
+- Overlay files listed in `chrome/selkies-dashboard/OVERLAY` are never overwritten by sync (`jolee-settings.js`, `jolee-bridge.js`, `jolee-shims/`, …). Put hop-only hide-flags and postMessage glue there.
+- Patches in this directory are rewires of vendored Selkies files (`Sidebar.jsx`, translations, …). Keep them small.
+
+## Series
+
+| patch | why |
+| --- | --- |
+| `0001-sidebar-jolee-rewire.patch` | postToCore instead of same-window selkies-core; hop comments |
+| `0002-player-gamepad-jolee-rewire.patch` | gamepad player shims (gamepads stay hidden) |
+| `0003-dashboard-overlay-hop-controls.patch` | overlay hop controls |
+| `0005-main-jsx-hop-entry.patch` | hop entry; no selkies-core |
+| `0006-gitignore-keep-package-lock.patch` | keep package-lock |
+| `0008-hide-sharing-until-enabled.patch` | seed hop settings; sharing/gamepads only if explicitly enabled |
+| `0009-clipboard-open-pc-label.patch` | clipboard open by default; “PC Clipboard” copy |
+
+See also `docs/chrome.md`.

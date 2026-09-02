@@ -9,10 +9,12 @@
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
 #jolee-core{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
 #root{position:relative;z-index:1}
+#keyboard-input-assist{position:absolute;left:-9999px}
 </style>
 </head>
 <body>
 <iframe id="jolee-core" title="Session hop core" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+<input id="keyboard-input-assist" type="text" autocomplete="off" aria-hidden="true">
 <div id="root"></div>
 <script>
 (function () {
@@ -23,7 +25,23 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
   search.set("embedded", "1");
   var src = "/viewer.html?" + search.toString();
   if (token) src += "#token=" + encodeURIComponent(token);
-  document.getElementById("jolee-core").src = src;
+  var iframe = document.getElementById("jolee-core");
+  iframe.src = src;
+  var assist = document.getElementById("keyboard-input-assist");
+  function postToCore(msg) {
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(msg, location.origin);
+    }
+  }
+  assist.addEventListener("focus", function () {
+    postToCore({ type: "showVirtualKeyboard" });
+  });
+  assist.addEventListener("keydown", function (e) {
+    postToCore({ type: "assistKey", e: "down", key: e.key, code: e.code });
+  });
+  assist.addEventListener("keyup", function (e) {
+    postToCore({ type: "assistKey", e: "up", key: e.key, code: e.code });
+  });
 })();
 </script>
 <script type="module" src="/dashboard/dashboard.js"></script>
