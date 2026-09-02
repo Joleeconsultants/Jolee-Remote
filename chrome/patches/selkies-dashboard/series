@@ -3,5 +3,4 @@
 0003-dashboard-overlay-hop-controls.patch
 0005-main-jsx-hop-entry.patch
 0006-gitignore-keep-package-lock.patch
-0007-sidebar-keyboard-desktop.patch
 0008-hide-sharing-until-enabled.patch
