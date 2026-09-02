@@ -37,3 +37,10 @@ flowchart LR
   Agent[Outbound agent] -->|WebSocket client| DO
 ```
 
+
+## Keeping chrome in sync
+
+This repo does not run Selkies and does not copy selkies-web-core.
+
+Dependabot covers npm weekly (Monday) at `/` and `/chrome/selkies-dashboard`, plus GitHub Actions at `/`. The dashboard is pinned in `chrome/selkies-dashboard/UPSTREAM`; overlay files in `OVERLAY` are kept; Jolee rewires are `chrome/patches/selkies-dashboard/` plus `scripts/sync-selkies-dashboard.sh` (`latest` or a SHA). A weekday Action opens an issue titled "Selkies dashboard upstream moved" when the pin is behind.
+

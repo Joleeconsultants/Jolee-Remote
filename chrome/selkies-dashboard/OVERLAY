@@ -1,0 +1,14 @@
+# Jolee overlay — never overwritten by scripts/sync-selkies-dashboard.sh
+NOTICE
+README.md
+LICENSE
+OVERLAY
+UPSTREAM
+package.json
+package-lock.json
+vite.config.js
+index.html
+src/jolee-bridge.js
+src/jolee-settings.js
+src/jolee-shims
+src/components/HopControls.jsx

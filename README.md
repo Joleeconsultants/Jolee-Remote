@@ -107,6 +107,16 @@ Outbound-connects as the agent, sends placeholder PNG frames, prints input. Prov
 
 ## Develop
 
-Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`). Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
+Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`), `build:dashboard`, `sync:dashboard`. Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
+
+
+## Keeping chrome in sync
+
+This repo does not run Selkies and does not copy selkies-web-core. Dashboard chrome is a modified vendored copy of `addons/selkies-dashboard`.
+
+- **Dependabot** (weekly Monday) covers npm at `/` and `/chrome/selkies-dashboard`, plus GitHub Actions at `/`.
+- **Pin:** `chrome/selkies-dashboard/UPSTREAM` records the Selkies repo, path, and commit. Files listed in `OVERLAY` are never overwritten. Jolee rewires live in `chrome/patches/selkies-dashboard/`.
+- **Bump:** `./scripts/sync-selkies-dashboard.sh` with no args re-applies the pinned SHA; pass `latest` or a commit SHA to move the pin. Refresh the patch series if apply fails. Same command: `npm run sync:dashboard`.
+- **Watch:** a weekday GitHub Action compares the pin to upstream and opens an issue titled "Selkies dashboard upstream moved" when they differ.
 
 License: MIT for the hop; dashboard chrome is MPL-2.0 (see chrome/selkies-dashboard/LICENSE and NOTICE).

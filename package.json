@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "wrangler dev",
-    "build:dashboard": "npm --prefix chrome/selkies-dashboard run build"
+    "build:dashboard": "npm --prefix chrome/selkies-dashboard run build",
+    "sync:dashboard": "bash scripts/sync-selkies-dashboard.sh"
   },
   "dependencies": {
     "partyserver": "^0.5.10",

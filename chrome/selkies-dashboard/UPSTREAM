@@ -1,0 +1,4 @@
+repo=https://github.com/selkies-project/selkies
+path=addons/selkies-dashboard
+commit=b0f1d830d18cf1b714a477c76ac47e50270eb8bd
+license=MPL-2.0
