@@ -7,8 +7,16 @@ import {
   MIN_TTL_SECONDS,
   type MintResponse,
 } from "./types";
+import { agentJoinPath, browserJoinPath } from "./joins";
 
 export { Session };
+export {
+  agentJoinPath,
+  browserJoinPath,
+  partyBrowserPath,
+  viewerPath,
+  viewerQuery,
+} from "./joins";
 
 const CORS: Record<string, string> = {
   "access-control-allow-origin": "*",
@@ -86,8 +94,8 @@ async function mint(request: Request, env: Env): Promise<Response> {
       expiresAt: minted.expiresAt,
       ttlSeconds: minted.ttlSeconds,
       joins: {
-        browser: "/sessions/" + minted.sessionId + "/browser?token=" + browserToken,
-        agent: "/sessions/" + minted.sessionId + "/agent?token=" + agentToken,
+        browser: browserJoinPath(minted.sessionId, browserToken),
+        agent: agentJoinPath(minted.sessionId, agentToken),
       },
     };
     return json(body, 201);

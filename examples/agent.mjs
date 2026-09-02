@@ -16,6 +16,7 @@ if (!sessionId || !token) {
   process.exit(1);
 }
 
+// Same path as agentJoinPath in src/joins.ts (not imported: this file is a standalone mjs).
 const url = base.replace(/\/$/, "") + "/sessions/" + sessionId + "/agent?token=" + encodeURIComponent(token);
 
 // 1x1 PNG so the viewer can paint with createImageBitmap/drawImage.

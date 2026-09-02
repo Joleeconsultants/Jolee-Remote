@@ -77,6 +77,8 @@ Auth in this repo is the mint-time join token only. No tenants, device directory
 
 ## Building the agent
 
+Consumer plug-in checklist (mint, joins, envelope, viewer query, what you keep): [docs/agent.md](docs/agent.md).
+
 The agent is a WebSocket **client**.
 
 1. Your app calls `POST /sessions` (or you mint out of band) and receives `sessionId` + `agentToken`.

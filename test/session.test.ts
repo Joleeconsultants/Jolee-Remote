@@ -7,6 +7,7 @@ import {
 } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { decodeEnvelope, encodeEnvelope } from "../src/envelope";
+import { agentJoinPath, browserJoinPath } from "../src/joins";
 import { Session } from "../src/session";
 
 type Minted = {
@@ -96,7 +97,8 @@ describe("session hop", () => {
     expect(minted.browserToken).toHaveLength(64);
     expect(minted.agentToken).toHaveLength(64);
     expect(minted.browserToken).not.toBe(minted.agentToken);
-    expect(minted.joins.agent).toContain("/sessions/" + minted.sessionId + "/agent");
+    expect(minted.joins.agent).toBe(agentJoinPath(minted.sessionId, minted.agentToken));
+    expect(minted.joins.browser).toBe(browserJoinPath(minted.sessionId, minted.browserToken));
 
     const statusRes = await SELF.fetch("https://example.com/sessions/" + minted.sessionId);
     expect(statusRes.status).toBe(200);
