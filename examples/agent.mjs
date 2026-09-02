@@ -45,6 +45,7 @@ let timer;
 ws.addEventListener("open", () => {
   console.log("agent connected", url);
   timer = setInterval(() => {
+    // Sample only sends kind 0x01 frames. Kind 0x03 audio is a real hop; this agent does not send it.
     const payload = n % 2 === 0 ? PNG : new TextEncoder().encode("placeholder-frame-" + n);
     ws.send(envelope(0x01, payload));
     n += 1;

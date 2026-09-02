@@ -1,6 +1,6 @@
 # Plug in your app
 
-Quick path: your backend mints a session on the hop Worker, opens the Selkies HTML URL, and your agent outbound-connects to the Worker. The hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. Pairing is 1:1; N browsers is a later consumer need.
+Quick path: your backend mints a session on the hop Worker, opens the Selkies HTML URL, and your agent outbound-connects to the Worker. The hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` / `audio` bytes. Pairing is 1:1; N browsers is a later consumer need.
 
 Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join).
 
@@ -99,10 +99,10 @@ Every binary WebSocket message:
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | version (`0x01`) |
-| 1 | 1 | kind: `0x01` frame (agent → browser, JPEG/WebP stills), `0x02` input (browser → agent, JSON opaque) |
+| 1 | 1 | kind: `0x01` frame (agent → browser, JPEG/WebP stills), `0x02` input (browser → agent, JSON opaque), `0x03` audio (agent → browser, complete media chunk) |
 | 2.. | n | opaque payload |
 
-No RFB. The hop does not interpret pixels or OS events. Malformed envelopes are dropped. Frames only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are in `src/envelope.ts`.
+No RFB. The hop does not interpret pixels, codecs, or OS events. Malformed envelopes and unknown kinds are dropped. Frames and audio only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are in `src/envelope.ts`.
 
 ### Applying input (viewer JSON)
 
@@ -112,13 +112,27 @@ The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSO
 - `{t:"key", e, key, code}` — `e` is `down` / `up`
 - `{t:"clipboard", text}` — browser → agent (sidebar PC Clipboard, text)
 - `{t:"clipboard", mime, data}` — browser → agent image clipboard. `mime` starts with `image/` (default `image/png`); `data` is base64. The viewer skips the send if the encoded envelope would exceed 1 MiB.
+- `{t:"resize", w, h}` — set capture size from the original screen panel
+- `{t:"resize", w, h, reset:true}` — reset capture size to `round(innerWidth)` / `round(innerHeight)`
+- `{t:"cssScaling", value}` — HiDPI / CSS scaling (`setUseCssScaling`)
+- `{t:"settings", settings}` — sidebar settings object (DPI, force aligned, …)
+- `{t:"audioDevice", context, deviceId}` — original audio panel device select
+- `{t:"pipeline", pipeline, enabled}` — chrome pipeline toggle (`audio` mutes playback in the viewer)
 
 To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose payload is UTF-8 JSON (not pixels). The hop does not parse it; the viewer does:
 
 - `{"t":"clipboard","text":"..."}` — posts `clipboardContentUpdate` `{text}` to the parent
 - `{"t":"clipboard","mime":"image/png","data":"<base64>"}` — posts `clipboardImageUpdate` `{mime, data}` to the parent (the sidebar may ignore inbound images)
 
-Do not invent extra envelope kinds. Frames stay agent → browser. Input stays browser → agent. Image clipboard uses the same kind `0x02` input / kind `0x01` JSON frame path as text — not a third envelope kind.
+Image clipboard stays on input JSON / JSON frame (kind `0x02` / kind `0x01`). Do not invent extra envelope kinds except audio `0x03`: audio is a byte stream like frames, so it is its own kind. The hop does not decode codecs. The viewer plays kind `0x03` as a complete media chunk (`Blob` + `Audio`; tries `audio/webm`, `ogg`, `wav`, `mpeg`). Sample `examples/agent.mjs` can keep sending frames only.
+
+Frames and audio stay agent → browser. Input stays browser → agent.
+
+### Leftover (no hop yet)
+
+Microphone (browser → agent audio), files, apps, sharing, webcam, stats, shortcuts, encoder / video settings (no pixelflux on this hop; agent owns capture encode). Gaming stays out unless asked.
+
+Visible chrome after this hop: screen (scale, AA, CSS cursors, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback, fullscreen, theme, mobile keyboard.
 
 ### Max binary message size
 

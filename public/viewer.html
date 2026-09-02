@@ -20,7 +20,8 @@ canvas.stretch{object-fit:fill}
 <script type="module">
 // Must match root package.json partysocket (currently 1.1.6).
 import PartySocket from "https://esm.sh/partysocket@1.1.6";
-const VERSION=1, KIND_FRAME=1, KIND_INPUT=2;
+const VERSION=1, KIND_FRAME=1, KIND_INPUT=2, KIND_AUDIO=3;
+const AUDIO_TYPES=["audio/webm","audio/ogg","audio/wav","audio/mpeg"];
 const canvas=document.getElementById("surface");
 const vk=document.getElementById("vk");
 const ctx=canvas.getContext("2d");
@@ -30,6 +31,7 @@ let session=params.get("session")||"";
 let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true, antiAliasing=true;
+let audioEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
 function applyScale(){
   canvas.classList.toggle("stretch", !scaleLocally);
 }
@@ -43,7 +45,14 @@ function setStatus(state){
   }
 }
 function encodeInput(payload){const body=new TextEncoder().encode(JSON.stringify(payload));const out=new Uint8Array(2+body.length);out[0]=VERSION;out[1]=KIND_INPUT;out.set(body,2);return out;}
-function decodeEnvelope(data){const bytes=data instanceof ArrayBuffer?new Uint8Array(data):new Uint8Array(data);if(bytes.length<2||bytes[0]!==VERSION)return null;if(bytes[1]!==KIND_FRAME&&bytes[1]!==KIND_INPUT)return null;return {kind:bytes[1]===KIND_FRAME?"frame":"input",payload:bytes.subarray(2)};}
+function decodeEnvelope(data){
+  const bytes=data instanceof ArrayBuffer?new Uint8Array(data):new Uint8Array(data);
+  if(bytes.length<2||bytes[0]!==VERSION)return null;
+  if(bytes[1]===KIND_FRAME)return {kind:"frame",payload:bytes.subarray(2)};
+  if(bytes[1]===KIND_INPUT)return {kind:"input",payload:bytes.subarray(2)};
+  if(bytes[1]===KIND_AUDIO)return {kind:"audio",payload:bytes.subarray(2)};
+  return null;
+}
 function clipboardTextFromFrame(payload){
   try{
     let i=0;
@@ -61,7 +70,52 @@ function clipboardTextFromFrame(payload){
 async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;applySmoothing();ctx.drawImage(bitmap,0,0);bitmap.close();}
 async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;applySmoothing();ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
 async function paintFrame(payload){try{await paintJpegOrPng(payload);return;}catch(e){}try{await paintH264(payload);}catch(e){ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#888";ctx.fillText("opaque frame "+payload.length+" bytes",16,24);}}
-function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}setStatus("disconnected");}
+function revokeAudioUrl(){
+  if(audioUrl){try{URL.revokeObjectURL(audioUrl);}catch(e){}audioUrl=null;}
+}
+function stopAudioPlayback(){
+  if(playingAudio){
+    try{playingAudio.pause();}catch(e){}
+    playingAudio.removeAttribute("src");
+    try{playingAudio.load();}catch(e){}
+    playingAudio=null;
+  }
+  revokeAudioUrl();
+}
+function applyAudioSink(el){
+  if(!el || !audioSinkId) return;
+  if(typeof HTMLMediaElement!=="undefined" && typeof HTMLMediaElement.prototype.setSinkId==="function" && typeof el.setSinkId==="function"){
+    Promise.resolve(el.setSinkId(audioSinkId)).catch(()=>{});
+  }
+}
+function setAudioEnabled(enabled){
+  audioEnabled=!!enabled;
+  if(playingAudio) playingAudio.muted=!audioEnabled;
+  if(!audioEnabled) stopAudioPlayback();
+}
+async function playAudioChunk(payload){
+  if(!audioEnabled) return;
+  for(const type of AUDIO_TYPES){
+    const url=URL.createObjectURL(new Blob([payload],{type}));
+    const el=new Audio();
+    el.muted=!audioEnabled;
+    try{
+      applyAudioSink(el);
+      el.src=url;
+      await el.play();
+      stopAudioPlayback();
+      audioUrl=url;
+      playingAudio=el;
+      el.muted=!audioEnabled;
+      applyAudioSink(el);
+      el.addEventListener("ended",()=>{if(audioUrl===url){revokeAudioUrl();if(playingAudio===el)playingAudio=null;}},{once:true});
+      return;
+    }catch(e){
+      try{URL.revokeObjectURL(url);}catch(err){}
+    }
+  }
+}
+function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();setStatus("disconnected");}
 function connect(opts){
   if(opts&&typeof opts==="object"){
     if(typeof opts.session==="string") session=opts.session;
@@ -90,7 +144,9 @@ function connect(opts){
       return;
     }
     const env=decodeEnvelope(ev.data);
-    if(!(env&&env.kind==="frame")) return;
+    if(!env) return;
+    if(env.kind==="audio"){playAudioChunk(env.payload);return;}
+    if(env.kind!=="frame") return;
     const clip=clipboardTextFromFrame(env.payload);
     if(clip!==null){
       if(window.parent!==window){
@@ -171,15 +227,34 @@ window.addEventListener("message",(event)=>{
     case "setUseBrowserCursors":
       canvas.style.cursor=msg.value?"default":"none";
       break;
-    // Hidden until hop exists: encoder, audio, files, apps, sharing, stats, webcam, capture resize.
-    // Gaming stays noop.
     case "pipelineControl":
-    case "settings":
-    case "gamepadControl":
-    case "setManualResolution":
-    case "resetResolutionToWindow":
-    case "setUseCssScaling":
+      if(msg.pipeline==="audio") setAudioEnabled(!!msg.enabled);
+      if(typeof msg.pipeline==="string") sendInput({t:"pipeline",pipeline:msg.pipeline,enabled:!!msg.enabled});
+      break;
     case "audioDeviceSelected":
+      if(typeof msg.context==="string"){
+        sendInput({t:"audioDevice",context:msg.context,deviceId:msg.deviceId});
+      }
+      if(msg.context==="output"){
+        audioSinkId=typeof msg.deviceId==="string"?msg.deviceId:"";
+        applyAudioSink(playingAudio);
+      }
+      break;
+    case "setManualResolution":
+      sendInput({t:"resize",w:msg.width,h:msg.height});
+      break;
+    case "resetResolutionToWindow":
+      sendInput({t:"resize",w:Math.round(innerWidth),h:Math.round(innerHeight),reset:true});
+      break;
+    case "setUseCssScaling":
+      sendInput({t:"cssScaling",value:!!msg.value});
+      break;
+    case "settings":
+      if(msg.settings) sendInput({t:"settings",settings:msg.settings});
+      break;
+    // Hidden until hop exists: microphone, files, apps, sharing, webcam, stats, shortcuts, encoder/video.
+    // Gaming stays noop.
+    case "gamepadControl":
     case "requestGamingMode":
     case "command":
     case "getStats":

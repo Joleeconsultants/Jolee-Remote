@@ -136,6 +136,36 @@ describe("session hop", () => {
     expect(toAgent?.kind).toBe("input");
     expect(Array.from(toAgent?.payload ?? [])).toEqual([1, 2, 3]);
 
+    const audio = encodeEnvelope("audio", new Uint8Array([4, 5, 6]));
+    agent.send(audio);
+    const toBrowserAudio = decodeEnvelope(await waitBinary(browser));
+    expect(toBrowserAudio?.kind).toBe("audio");
+    expect(Array.from(toBrowserAudio?.payload ?? [])).toEqual([4, 5, 6]);
+
+    browser.close(1000, "done");
+    agent.close(1000, "done");
+  });
+
+  it("forwards audio only agent to browser and drops unknown kinds", async () => {
+    const minted = await mint();
+    const browser = await openWs(browserJoinPath(minted.sessionId, minted.browserToken));
+    const agent = await openWs(minted.joins.agent);
+    await waitUntilState(minted.sessionId, "paired");
+
+    browser.send(encodeEnvelope("audio", new Uint8Array([99])));
+    const input = encodeEnvelope("input", new Uint8Array([7, 7]));
+    browser.send(input);
+    const toAgent = decodeEnvelope(await waitBinary(agent));
+    expect(toAgent?.kind).toBe("input");
+    expect(Array.from(toAgent?.payload ?? [])).toEqual([7, 7]);
+
+    agent.send(new Uint8Array([1, 0x99, 1, 2, 3]));
+    const small = encodeEnvelope("frame", new Uint8Array([5]));
+    agent.send(small);
+    const later = decodeEnvelope(await waitBinary(browser));
+    expect(later?.kind).toBe("frame");
+    expect(Array.from(later?.payload ?? [])).toEqual([5]);
+
     browser.close(1000, "done");
     agent.close(1000, "done");
   });

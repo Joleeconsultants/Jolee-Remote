@@ -6,8 +6,8 @@
 
 /**
  * Original conditional-setting specs so the vendored sidebar still compiles.
- * Not copied from selkies-web-core. Encoder/pipeline specs still post
- * settings messages; the hop core no-ops Selkies-only pipeline types.
+ * Not copied from selkies-web-core. Encoder specs still post settings
+ * messages (hop forwards `settings`; no pixelflux). Gaming stays noop.
  * @module
  */
 

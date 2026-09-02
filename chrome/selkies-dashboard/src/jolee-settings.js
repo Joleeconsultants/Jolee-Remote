@@ -6,10 +6,12 @@
 
 /**
  * Overlay hide-flags for the vendored sidebar. Add chrome back as the hop
- * grows; do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop
- * exists. Hide gaming (gamepads, gaming mode, trackpad, extra players).
- * Image clipboard is a hop path: enable_binary_clipboard is unlocked.
- * Prefer this overlay for flags so Sidebar patches stay small.
+ * grows; do not show Apps/Sharing/Files/Stats/Webcam until that hop exists.
+ * Hide gaming (gamepads, gaming mode, trackpad, extra players).
+ * Audio playback (kind 0x03) and screen size / DPI / HiDPI are unlocked.
+ * Microphone stays locked (later hop). Encoder/video settings stay hidden
+ * (no pixelflux). Image clipboard is a hop path: enable_binary_clipboard
+ * is unlocked. Prefer this overlay for flags so Sidebar patches stay small.
  * Locked settings make isRenderable return false (or hide the manual
  * resolution block via serverSettings.manual_resolution.locked).
  */
@@ -22,7 +24,7 @@ export const JOLEE_SERVER_SETTINGS = {
   ui_show_logo: flag(false),
   ui_sidebar_show_video_settings: flag(false),
   ui_sidebar_show_screen_settings: flag(true),
-  ui_sidebar_show_audio_settings: flag(false),
+  ui_sidebar_show_audio_settings: flag(true),
   ui_sidebar_show_stats: flag(false),
   ui_sidebar_show_clipboard: flag(true),
   ui_sidebar_show_files: flag(false),
@@ -46,17 +48,17 @@ export const JOLEE_SERVER_SETTINGS = {
   enable_dual_mode: flag(false),
   enable_binary_clipboard: { value: true },
   enable_rate_control: flag(false),
-  audio_enabled: { value: false, locked: true },
+  audio_enabled: { value: true },
   microphone_enabled: { value: false, locked: true },
   webcam_enabled: { value: false, locked: true },
   gamepad_enabled: { value: false, locked: true },
-  // Hop pointer is already 0–1; CSS scaling / HiDPI is unused.
-  use_css_scaling: { value: true, locked: true },
-  force_aligned_resolution: { value: false, locked: true },
-  // Hop cannot apply OS DPI; do not ship the 96..288 dropdown.
-  scaling_dpi: { value: "96", locked: true },
-  // Capture size is agent-side; the hop canvas does not resize.
-  manual_resolution: { value: false, locked: true },
+  use_css_scaling: { value: true },
+  force_aligned_resolution: { value: false },
+  scaling_dpi: {
+    value: "96",
+    allowed: ["96", "120", "144", "168", "192", "216", "240", "264", "288"],
+  },
+  manual_resolution: { value: false },
   file_transfers: { value: "" },
 };
 

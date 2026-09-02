@@ -91,10 +91,10 @@ The hop does not interpret pixels or OS events. Every binary WebSocket message i
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | version (`0x01`) |
-| 1 | 1 | kind: `0x01` frame (agent to browser, JPEG/WebP), `0x02` input (browser to agent, JSON opaque) |
+| 1 | 1 | kind: `0x01` frame (agent to browser, JPEG/WebP), `0x02` input (browser to agent, JSON opaque), `0x03` audio (agent to browser, media chunk) |
 | 2.. | n | opaque payload |
 
-Malformed envelopes are dropped. Frames are forwarded only from the agent connection to the browser connection. Input is forwarded only from the browser connection to the agent connection. Pairing must be complete before bytes flow.
+Malformed envelopes and unknown kinds are dropped. Frames and audio are forwarded only from the agent connection to the browser connection. Input is forwarded only from the browser connection to the agent connection. Pairing must be complete before bytes flow. Image clipboard stays on input JSON / JSON frame; audio is kind `0x03` because it is a byte stream like frames.
 
 Cloudflare Durable Objects accept received WebSocket messages up to **32 MiB** ([limits](https://developers.cloudflare.com/durable-objects/platform/limits/)). This hop drops envelopes larger than **1 MiB** (`MAX_ENVELOPE_BYTES`) so JPEG/WebP stills at low fps stay inside a conservative cap.
 
@@ -131,7 +131,7 @@ The agent is a WebSocket **client**.
 
    Better: omit the query token and send `{"type":"join","token":"<agentToken>"}` as the first text message, or `Authorization: Bearer <agentToken>` on the upgrade. Query string is fallback. Any WebSocket client works.
 3. Wait until you see a `status` message with `state: "paired"` (browser is in).
-4. Send binary envelopes with kind `frame` (`0x01`) and JPEG/WebP stills under 1 MiB. Read kind `input` (`0x02`) JSON payloads and apply them on the device.
+4. Send binary envelopes with kind `frame` (`0x01`) and JPEG/WebP stills under 1 MiB. Optional kind `audio` (`0x03`) is a complete media chunk agent → browser. Read kind `input` (`0x02`) JSON payloads and apply them on the device.
 5. If the browser drops, the session ends. If TTL fires, the session ends. Later joins are rejected.
 
 Rejects: mint `401` without secret when configured. Second browser or second agent (`409`). Expired (`410`). Unknown session (`404`). Bad token (`403`).

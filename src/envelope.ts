@@ -1,6 +1,7 @@
 export const ENVELOPE_VERSION = 1;
 export const KIND_FRAME = 0x01;
 export const KIND_INPUT = 0x02;
+export const KIND_AUDIO = 0x03;
 
 /**
  * Hop cap for a single binary envelope (JPEG/WebP stills at low fps).
@@ -10,13 +11,26 @@ export const KIND_INPUT = 0x02;
  */
 export const MAX_ENVELOPE_BYTES = 1024 * 1024;
 
-export type EnvelopeKind = "frame" | "input";
+export type EnvelopeKind = "frame" | "input" | "audio";
 
 export type Envelope = {
   version: number;
   kind: EnvelopeKind;
   payload: Uint8Array;
 };
+
+const KIND_TO_BYTE: Record<EnvelopeKind, number> = {
+  frame: KIND_FRAME,
+  input: KIND_INPUT,
+  audio: KIND_AUDIO,
+};
+
+function kindFromByte(kindByte: number): EnvelopeKind | null {
+  if (kindByte === KIND_FRAME) return "frame";
+  if (kindByte === KIND_INPUT) return "input";
+  if (kindByte === KIND_AUDIO) return "audio";
+  return null;
+}
 
 export function encodeEnvelope(
   kind: EnvelopeKind,
@@ -26,7 +40,7 @@ export function encodeEnvelope(
     typeof payload === "string" ? new TextEncoder().encode(payload) : payload;
   const out = new Uint8Array(2 + body.byteLength);
   out[0] = ENVELOPE_VERSION;
-  out[1] = kind === "frame" ? KIND_FRAME : KIND_INPUT;
+  out[1] = KIND_TO_BYTE[kind];
   out.set(body, 2);
   return out;
 }
@@ -40,11 +54,11 @@ export function decodeEnvelope(
       : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   if (bytes.byteLength < 2) return null;
   if (bytes[0] !== ENVELOPE_VERSION) return null;
-  const kindByte = bytes[1];
-  if (kindByte !== KIND_FRAME && kindByte !== KIND_INPUT) return null;
+  const kind = kindFromByte(bytes[1]);
+  if (!kind) return null;
   return {
     version: bytes[0],
-    kind: kindByte === KIND_FRAME ? "frame" : "input",
+    kind,
     payload: bytes.subarray(2),
   };
 }

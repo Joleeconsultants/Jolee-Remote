@@ -2,29 +2,34 @@
 
 Quilt-style series applied by `scripts/sync-selkies-dashboard.sh` after copying upstream `addons/selkies-dashboard`.
 
-The series rewires Selkies chrome onto the hop canvas. Add chrome back as the hop grows. Do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop exists. Hide gaming (gamepads, gaming mode, trackpad, extra player seats).
+The series rewires Selkies chrome onto the hop canvas. Slow-add: only show chrome when that hop exists. Prefer overlay `chrome/selkies-dashboard/src/jolee-settings.js` for hide-flags so Sidebar diffs stay small. Do not invent a new UI.
 
-## Hide unused UI
+## Visible now (hop exists)
 
-Prefer overlay `chrome/selkies-dashboard/src/jolee-settings.js` for hide-flags (`locked: true` / `ui_sidebar_show_*: false`) so Sidebar diffs stay small.
-
-**Visible** (hop exists)
-
-- Screen: scale locally, anti-aliasing, CSS cursors
-- PC Clipboard (open by default), including Image Support / upload (`enable_binary_clipboard` unlocked)
+- Screen: scale locally, anti-aliasing, CSS cursors, HiDPI, force aligned, UI scaling, resolution (presets / manual / Set / Reset)
+- PC Clipboard (open by default), text + image (`enable_binary_clipboard` unlocked)
+- Audio playback (envelope kind `0x03` agent → browser)
 - Fullscreen and theme
 - Mobile/touch keyboard FAB (original Selkies; not in the sidebar)
 
-Image clipboard is a hop path: input JSON `{t:"clipboard", mime, data}` (base64) browser→agent; optional JSON clipboard frame agent→browser. Do not claim the hop has a Selkies pixelflux encoder.
+Image clipboard stays on input JSON / JSON-frame. Audio is envelope kind `0x03` because it is a byte stream like frames, not JSON. Do not claim the hop has a Selkies pixelflux encoder.
 
-**Hidden until that hop exists**
+## What's left (hidden until that hop exists)
 
-- Apps, sharing, files, stats, webcam, audio, encoder/video settings, shortcuts
-- HiDPI (`use_css_scaling`), force aligned resolution, UI scaling / OS DPI, manual and preset resolution
+Leftover list of recommended chrome not yet hopped:
 
-**Hidden (gaming)**
+- Microphone
+- Files
+- Apps
+- Sharing
+- Webcam
+- Stats
+- Shortcuts
+- Encoder / video settings (no pixelflux)
 
-- Gamepads, gaming mode, trackpad, extra player seats (player2/3/4, dual_mode)
+Gaming stays out (gamepads, gaming mode, trackpad, extra player seats).
+
+See also the leftover list in [docs/chrome.md](../../../docs/chrome.md#whats-left) and [docs/agent.md](../../../docs/agent.md).
 
 ## Overlay vs patches
 

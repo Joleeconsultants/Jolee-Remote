@@ -8,16 +8,16 @@ export const HANDLED_DASHBOARD_TYPES = [
   "clipboardImageUpdate",
   "setAntiAliasing",
   "setUseBrowserCursors",
-] as const;
-
-export const NOOP_DASHBOARD_TYPES = [
   "pipelineControl",
-  "settings",
-  "gamepadControl",
+  "audioDeviceSelected",
   "setManualResolution",
   "resetResolutionToWindow",
   "setUseCssScaling",
-  "audioDeviceSelected",
+  "settings",
+] as const;
+
+export const NOOP_DASHBOARD_TYPES = [
+  "gamepadControl",
   "requestGamingMode",
   "command",
   "getStats",
@@ -40,6 +40,12 @@ export type DashboardAction =
   | "clipboardImageUpdate"
   | "setAntiAliasing"
   | "setUseBrowserCursors"
+  | "pipelineControl"
+  | "audioDeviceSelected"
+  | "setManualResolution"
+  | "resetResolutionToWindow"
+  | "setUseCssScaling"
+  | "settings"
   | "noop"
   | "ignore";
 

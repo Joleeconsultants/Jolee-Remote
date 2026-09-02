@@ -131,10 +131,12 @@ export class Session extends Server<Env> {
     if (!this.hasRole("browser") || !this.hasRole("agent")) return;
 
     const sender = this.roleOf(connection);
-    if (decoded.kind === "frame" && sender !== "agent") return;
+    // Frames and audio are agent → browser only. Input is browser → agent.
+    // Unknown kinds are already dropped by decodeEnvelope.
+    if ((decoded.kind === "frame" || decoded.kind === "audio") && sender !== "agent") return;
     if (decoded.kind === "input" && sender !== "browser") return;
 
-    const target: Role = decoded.kind === "frame" ? "browser" : "agent";
+    const target: Role = decoded.kind === "input" ? "agent" : "browser";
     for (const peer of this.getConnections<ConnState>(target)) {
       if (peer.id === connection.id) continue;
       if (!this.isJoined(peer)) continue;

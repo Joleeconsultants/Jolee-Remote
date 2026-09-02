@@ -17,14 +17,20 @@ describe("dashboard postMessage protocol", () => {
     expect(classifyDashboardMessage({ type: "setUseBrowserCursors", value: true })).toBe("setUseBrowserCursors");
   });
 
+  it("handles audio playback and screen-size hops", () => {
+    expect(classifyDashboardMessage({ type: "pipelineControl", pipeline: "audio", enabled: false })).toBe("pipelineControl");
+    expect(classifyDashboardMessage({ type: "audioDeviceSelected", context: "output", deviceId: "default" })).toBe("audioDeviceSelected");
+    expect(classifyDashboardMessage({ type: "setManualResolution", width: 1920, height: 1080 })).toBe("setManualResolution");
+    expect(classifyDashboardMessage({ type: "resetResolutionToWindow" })).toBe("resetResolutionToWindow");
+    expect(classifyDashboardMessage({ type: "setUseCssScaling", value: true })).toBe("setUseCssScaling");
+    expect(classifyDashboardMessage({ type: "settings", settings: { scaling_dpi: 96 } })).toBe("settings");
+  });
+
   it("no-ops chrome that has no hop yet", () => {
-    expect(classifyDashboardMessage({ type: "pipelineControl", pipeline: "video", enabled: false })).toBe("noop");
-    expect(classifyDashboardMessage({ type: "settings", settings: { framerate: 60 } })).toBe("noop");
     expect(classifyDashboardMessage({ type: "command", value: "ls" })).toBe("noop");
-    expect(classifyDashboardMessage({ type: "setManualResolution", width: 1920, height: 1080 })).toBe("noop");
-    expect(classifyDashboardMessage({ type: "resetResolutionToWindow" })).toBe("noop");
     expect(classifyDashboardMessage({ type: "gamepadControl", enabled: true })).toBe("noop");
     expect(classifyDashboardMessage({ type: "requestGamingMode" })).toBe("noop");
+    expect(classifyDashboardMessage({ type: "getStats" })).toBe("noop");
   });
 
   it("ignores malformed payloads", () => {

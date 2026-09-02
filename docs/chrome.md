@@ -8,6 +8,12 @@ This repo ships modified Selkies dashboard chrome, not the Selkies streaming sta
 
 Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`src/`, `public/viewer.html`, Worker, Durable Object) is MIT.
 
+## Goal
+
+The product goal is to build ALL recommended remote-desktop features this way: add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+
+Leftover list = recommended features not yet hopped, not a junk drawer.
+
 The chrome only keeps controls the hop can actually drive. Add chrome back as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
 ## Join
@@ -50,6 +56,12 @@ Same-origin `window` messages from the parent shell to `iframe#jolee-core`.
 | `assistKey` | `{e, key, code}` | input envelope `{t:key,...}` from parent `#keyboard-input-assist` |
 | `clipboardUpdateFromUI` | `{text}` | input envelope `{t:clipboard, text}` if connected |
 | `clipboardImageUpdate` | `{imageBlob}` | Blob/File from the sidebar; viewer base64-encodes and sends `{t:clipboard, mime, data}` if the envelope is ≤ 1 MiB |
+| `pipelineControl` | `{pipeline, enabled}` | `audio`: mute / stop playback. Also input `{t:pipeline, pipeline, enabled}` |
+| `audioDeviceSelected` | `{context, deviceId}` | output uses `setSinkId` if present; also `sendInput({t:"audioDevice", context, deviceId})` |
+| `setManualResolution` | `{width, height}` | `sendInput({t:"resize", w, h})` |
+| `resetResolutionToWindow` | | `sendInput({t:"resize", w:round(innerWidth), h:round(innerHeight), reset:true})` |
+| `setUseCssScaling` | `{value: boolean}` | `sendInput({t:"cssScaling", value})` |
+| `settings` | `{settings}` | if present, `sendInput({t:"settings", settings})` covering `scaling_dpi` and `force_aligned_resolution` |
 
 Core to parent (only when window.parent is not window):
 
@@ -59,7 +71,23 @@ Core to parent (only when window.parent is not window):
 | `clipboardContentUpdate` | `{text}` — viewer saw a frame whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}`. Hop does not parse it. |
 | `clipboardImageUpdate` | `{mime, data}` — viewer saw a JSON clipboard frame with `mime` starting `image/` and base64 `data`. Sidebar may ignore this. |
 
-**Hidden until that hop exists.** Encoder/video, audio, files, apps, sharing, stats, shortcuts, webcam, HiDPI, UI scaling, and manual resolution stay locked off in `JOLEE_SERVER_SETTINGS` (`chrome/selkies-dashboard/src/jolee-settings.js`). Gaming (gamepads, gaming mode, trackpad, extra player seats) stays hidden. Image clipboard is unlocked: it is a hop JSON path, not a Selkies pixelflux encoder. A leftover postMessage of still-hidden types is ignored so a stale build cannot crash the core.
+## What's left
+
+**Visible now:** screen (scale locally, AA, CSS cursors, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback (kind `0x03`), fullscreen, theme, mobile keyboard.
+
+**Hidden until that hop exists** (leftover list):
+
+- Microphone (browser → agent audio)
+- Files
+- Apps
+- Sharing
+- Webcam
+- Stats
+- Shortcuts
+- Encoder / video settings (no pixelflux on this hop; agent owns capture encode)
+- Gaming (out unless asked)
+
+Gaming (gamepads, gaming mode, trackpad, extra player seats) stays hidden. Image clipboard is unlocked: it is a hop JSON path, not a Selkies pixelflux encoder. A leftover postMessage of still-hidden types is ignored so a stale build cannot crash the core.
 
 ```mermaid
 flowchart LR
@@ -71,9 +99,15 @@ flowchart LR
 
 ## Keeping chrome in sync
 
+### Goal
+
+The product goal is to build ALL recommended remote-desktop features this way: add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label, clipboard open by default). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+
+Leftover list = recommended features not yet hopped, not a junk drawer.
+
 This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
-The patch series exists to rewire that chrome onto the hop canvas. Add chrome back as the hop grows; do not show Apps/Sharing/Files/Stats/Webcam/Audio until that hop exists. Hide gaming. Prefer overlay `src/jolee-settings.js` hide-flags so Sidebar diffs stay small. See [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
+The patch series exists to rewire that chrome onto the hop canvas. Add chrome back as the hop grows; a panel appears only after its hop exists. Prefer overlay `src/jolee-settings.js` hide-flags so Sidebar diffs stay small. See [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
 Do not bump packages past what the source uses: dashboard npm follows the pinned Selkies package.json; wrangler, workers-types, partyserver, and partysocket follow those sources, not latest-on-npm.
 
