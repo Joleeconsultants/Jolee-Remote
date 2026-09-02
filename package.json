@@ -8,7 +8,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "build:dashboard": "npm --prefix chrome/selkies-dashboard run build"
   },
   "dependencies": {
     "partyserver": "^0.5.10",

@@ -28,3 +28,7 @@ sequenceDiagram
   Session->>Agent: envelope input
   Note over Session: TTL or peer drop teardown
 ```
+
+# Chrome vs hop
+
+The hop in this document is MIT. Dashboard chrome is a modified Selkies example dashboard (MPL-2.0) that overlays the hop core iframe and talks to it with postMessage. Jolee Remote does not run Selkies. Details: chrome.md.

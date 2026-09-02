@@ -95,7 +95,7 @@ Hibernation: the session class extends `partyserver` `Server` with `static optio
 
 ## Viewer shell
 
-Served at `/` and `/viewer.html`. Query params: `session`, `token` (browser join token), `hop` (Worker host, default this origin). Connect, status (waiting / paired / expired / disconnected), canvas, disconnect. Uses **PartySocket** for the browser WebSocket only. Not a product portal.
+Served at `/` (shell with dashboard chrome around an iframe of the core) and `/viewer.html` (core). Query params: `session`, `token` (browser join token), `hop` (Worker host, default this origin). The dashboard posts connect, disconnect, requestFullscreen, setScaleLocally, showVirtualKeyboard, and clipboardUpdateFromUI to the core; the core posts status waiting | paired | expired | disconnected. Uses **PartySocket** for the browser WebSocket only. See docs/chrome.md. This repo does not run Selkies. Not a product portal.
 
 ## Tiny sample client
 
@@ -107,6 +107,6 @@ Outbound-connects as the agent, sends placeholder PNG frames, prints input. Prov
 
 ## Develop
 
-Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`). Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
+Package scripts: `typecheck`, `test`, `dev` (`wrangler dev`). Dashboard chrome builds from chrome/selkies-dashboard. Tests use `@cloudflare/vitest-pool-workers`. Do not deploy from this repo as part of the framework itself.
 
-License: MIT.
+License: MIT for the hop; dashboard chrome is MPL-2.0 (see chrome/selkies-dashboard/LICENSE and NOTICE).

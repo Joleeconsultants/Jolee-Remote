@@ -2,19 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Session hop viewer</title>
+<title>Session hop core</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-body{margin:0;background:#111;color:#e8e8e8;font-family:ui-sans-serif,system-ui,sans-serif}
+html,body{margin:0;height:100%;background:#000;color:#e8e8e8;font-family:ui-sans-serif,system-ui,sans-serif}
+body.embedded header{display:none}
 header{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end;padding:.75rem 1rem;background:#1a1a1a;border-bottom:1px solid #333}
 label{display:flex;flex-direction:column;gap:.2rem;font-size:.75rem;color:#aaa}
 input{background:#000;color:#eee;border:1px solid #444;padding:.4rem .5rem;min-width:12rem}
 button{padding:.45rem .8rem;cursor:pointer}
 #status{font-size:.85rem;padding:.25rem .7rem;border-radius:999px;background:#333}
-main{padding:1rem}
+main{padding:0;height:100%}
+body:not(.embedded) main{padding:1rem;height:auto}
 canvas{display:block;max-width:100%;background:#000;border:1px solid #333}
+body.embedded canvas{width:100%;height:100%;max-width:none;border:0;object-fit:contain}
+body.embedded canvas.stretch{object-fit:fill}
 #hint{color:#888;font-size:.85rem;margin-top:.5rem}
-</style></head><body>
+body.embedded #hint,#vk{display:none}
+body.embedded #vk.show{display:block;position:absolute;left:-9999px}
+</style></head>
+<body>
 <header>
 <label>Session <input id="session" autocomplete="off" /></label>
 <label>Browser token <input id="token" autocomplete="off" /></label>
@@ -23,8 +30,11 @@ canvas{display:block;max-width:100%;background:#000;border:1px solid #333}
 <button id="disconnect" type="button">Disconnect</button>
 <span id="status">disconnected</span>
 </header>
-<main><canvas id="surface" width="640" height="360" tabindex="0"></canvas>
-<p id="hint">Opaque frames paint with the browser (createImageBitmap/drawImage or WebCodecs). Pointer and keyboard send input envelopes. Query params: session, token, hop.</p></main>
+<main>
+<canvas id="surface" width="640" height="360" tabindex="0"></canvas>
+<p id="hint">Opaque frames paint with the browser. Pointer and keyboard send input envelopes. Query params: session, token, hop. postMessage from the dashboard chrome: connect, disconnect, requestFullscreen, setScaleLocally, showVirtualKeyboard, clipboardUpdateFromUI.</p>
+<input id="vk" type="text" autocomplete="off" aria-hidden="true" />
+</main>
 <script type="module">
 import PartySocket from "https://esm.sh/partysocket@1.1.6";
 const VERSION=1, KIND_FRAME=1, KIND_INPUT=2;
@@ -33,27 +43,126 @@ const tokenEl=document.getElementById("token");
 const hopEl=document.getElementById("hop");
 const statusEl=document.getElementById("status");
 const canvas=document.getElementById("surface");
+const vk=document.getElementById("vk");
 const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
 sessionEl.value=params.get("session")||"";
 tokenEl.value=params.get("token")||"";
 hopEl.value=params.get("hop")||"";
-let socket=null, videoDecoder=null;
-function setStatus(v){statusEl.textContent=v;}
+const embedded=params.get("embedded")==="1";
+if(embedded) document.body.classList.add("embedded");
+let socket=null, videoDecoder=null, scaleLocally=true;
+function applyScale(){
+  canvas.classList.toggle("stretch", !scaleLocally);
+}
+function postStatus(state){
+  statusEl.textContent=state;
+  const payload={type:"status",state};
+  if(window.parent!==window){
+    window.parent.postMessage(payload, window.location.origin);
+  }
+}
+function setStatus(v){ postStatus(v); }
 function encodeInput(payload){const body=new TextEncoder().encode(JSON.stringify(payload));const out=new Uint8Array(2+body.length);out[0]=VERSION;out[1]=KIND_INPUT;out.set(body,2);return out;}
 function decodeEnvelope(data){const bytes=data instanceof ArrayBuffer?new Uint8Array(data):new Uint8Array(data);if(bytes.length<2||bytes[0]!==VERSION)return null;if(bytes[1]!==KIND_FRAME&&bytes[1]!==KIND_INPUT)return null;return {kind:bytes[1]===KIND_FRAME?"frame":"input",payload:bytes.subarray(2)};}
 async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;ctx.drawImage(bitmap,0,0);bitmap.close();}
 async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
 async function paintFrame(payload){try{await paintJpegOrPng(payload);return;}catch(e){}try{await paintH264(payload);}catch(e){ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#888";ctx.fillText("opaque frame "+payload.length+" bytes",16,24);}}
 function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}setStatus("disconnected");}
-function connect(){const session=sessionEl.value.trim();const token=tokenEl.value.trim();const hop=hopEl.value.trim()||location.host;if(!session||!token){setStatus("disconnected");return;}disconnect();const url=new URL(location.href);url.searchParams.set("session",session);url.searchParams.set("token",token);if(hopEl.value.trim())url.searchParams.set("hop",hop);else url.searchParams.delete("hop");history.replaceState(null,"",url);socket=new PartySocket({host:hop,party:"session",room:session,query:{token:token,role:"browser"}});socket.binaryType="arraybuffer";socket.addEventListener("open",()=>setStatus("waiting"));socket.addEventListener("close",()=>setStatus("disconnected"));socket.addEventListener("message",(ev)=>{if(typeof ev.data==="string"){try{const msg=JSON.parse(ev.data);if(msg.type==="status")setStatus(msg.state);}catch(e){}return;}const env=decodeEnvelope(ev.data);if(env&&env.kind==="frame")paintFrame(env.payload);});}
+function connect(opts){
+  if(opts&&typeof opts==="object"){
+    if(typeof opts.session==="string") sessionEl.value=opts.session;
+    if(typeof opts.token==="string") tokenEl.value=opts.token;
+    if(typeof opts.hop==="string") hopEl.value=opts.hop;
+  }
+  const session=sessionEl.value.trim();
+  const token=tokenEl.value.trim();
+  const hop=hopEl.value.trim()||location.host;
+  if(!session||!token){setStatus("disconnected");return;}
+  disconnect();
+  const url=new URL(location.href);
+  url.searchParams.set("session",session);
+  url.searchParams.set("token",token);
+  if(hopEl.value.trim())url.searchParams.set("hop",hop);else url.searchParams.delete("hop");
+  if(embedded) url.searchParams.set("embedded","1");
+  history.replaceState(null,"",url);
+  socket=new PartySocket({host:hop,party:"session",room:session,query:{token:token,role:"browser"}});
+  socket.binaryType="arraybuffer";
+  socket.addEventListener("open",()=>setStatus("waiting"));
+  socket.addEventListener("close",()=>setStatus("disconnected"));
+  socket.addEventListener("message",(ev)=>{
+    if(typeof ev.data==="string"){
+      try{const msg=JSON.parse(ev.data);if(msg.type==="status")setStatus(msg.state);}catch(e){}
+      return;
+    }
+    const env=decodeEnvelope(ev.data);
+    if(env&&env.kind==="frame")paintFrame(env.payload);
+  });
+}
 function sendInput(payload){if(!socket||socket.readyState!==1)return;socket.send(encodeInput(payload));}
+function requestFullscreen(){
+  const req=canvas.requestFullscreen||canvas.webkitRequestFullscreen;
+  if(req) Promise.resolve(req.call(canvas)).catch(()=>{});
+}
+function showVirtualKeyboard(){
+  canvas.focus();
+  vk.classList.add("show");
+  vk.focus();
+}
+function clipboardUpdateFromUI(text){
+  sendInput({t:"clipboard",text:String(text||"")});
+}
 canvas.addEventListener("pointermove",(e)=>{const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"move",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.buttons});});
 canvas.addEventListener("pointerdown",(e)=>{canvas.setPointerCapture(e.pointerId);const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"down",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.button});});
 canvas.addEventListener("pointerup",(e)=>{const r=canvas.getBoundingClientRect();sendInput({t:"pointer",e:"up",x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height,b:e.button});});
 canvas.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,code:e.code});e.preventDefault();});
 canvas.addEventListener("keyup",(e)=>{sendInput({t:"key",e:"up",key:e.key,code:e.code});e.preventDefault();});
-document.getElementById("connect").addEventListener("click",connect);
+vk.addEventListener("keydown",(e)=>{sendInput({t:"key",e:"down",key:e.key,code:e.code});});
+vk.addEventListener("keyup",(e)=>{sendInput({t:"key",e:"up",key:e.key,code:e.code});});
+document.getElementById("connect").addEventListener("click",()=>connect());
 document.getElementById("disconnect").addEventListener("click",disconnect);
-if(sessionEl.value&&tokenEl.value)connect();
+window.addEventListener("message",(event)=>{
+  if(event.origin!==window.location.origin) return;
+  if(window.parent!==window && event.source!==window.parent) return;
+  const msg=event.data;
+  if(!msg||typeof msg!=="object") return;
+  switch(msg.type){
+    case "connect": connect(msg); break;
+    case "disconnect": disconnect(); break;
+    case "requestFullscreen": requestFullscreen(); break;
+    case "setScaleLocally":
+      scaleLocally=!!msg.value;
+      applyScale();
+      break;
+    case "showVirtualKeyboard": showVirtualKeyboard(); break;
+    case "clipboardUpdateFromUI": clipboardUpdateFromUI(msg.text); break;
+    // Selkies-only pipeline toggles do not apply to this hop: no encoder, audio, or command shell.
+    case "pipelineControl":
+    case "settings":
+    case "gamepadControl":
+    case "setManualResolution":
+    case "resetResolutionToWindow":
+    case "setUseCssScaling":
+    case "setAntiAliasing":
+    case "audioDeviceSelected":
+    case "requestGamingMode":
+    case "command":
+    case "getStats":
+    case "sidebarVisibilityChanged":
+    case "TOUCH_GAMEPAD_SETUP":
+    case "TOUCH_GAMEPAD_VISIBILITY":
+    case "touchinput:trackpad":
+    case "touchinput:touch":
+    case "setSynth":
+    case "clipboardImageUpdate":
+    case "setUseBrowserCursors":
+    case "mode":
+      break;
+    default:
+      break;
+  }
+});
+applyScale();
+setStatus("disconnected");
+if(sessionEl.value&&tokenEl.value) connect();
 </script></body></html>
