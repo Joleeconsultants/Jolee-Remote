@@ -1,8 +1,8 @@
 # Plug in your app
 
-Your app mints a hop session, stores the ids, hands the outbound agent a join URL + token, and opens **Selkies chrome** as the session UI. This hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. No RFB. N browsers is a later consumer need, not this version.
+Quick path: your backend mints a session on the hop Worker, opens the Selkies HTML URL, and your agent outbound-connects to the Worker. The hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` bytes. Pairing is 1:1; N browsers is a later consumer need.
 
-Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join). 
+Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join).
 
 ## Mint
 
@@ -17,20 +17,54 @@ Your app: `POST /sessions` on the hop Worker with optional JSON `{ "ttlSeconds":
 
 Missing or wrong secret → `401`. Local `wrangler dev` with `MINT_SECRET` unset keeps open mint so you can iterate without a secret; production must set one (`wrangler secret put MINT_SECRET`).
 
+Local (open mint):
+
+```bash
+curl -sS -X POST http://127.0.0.1:8787/sessions -H 'content-type: application/json' -d '{"ttlSeconds": 900}'
+```
+
+Production (Worker host, not the HTML host unless they share an origin):
+
+```bash
+curl -sS -X POST https://hop.example.com/sessions -H 'Authorization: Bearer …'
+```
+
+HTTP `201`. Example local mint body:
+
+```json
+{
+  "sessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "browserToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "agentToken": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "expiresAt": 1770000000000,
+  "ttlSeconds": 900,
+  "joins": {
+    "browser": "/?session=3fa85f64-5717-4562-b3fc-2c963f66afa6&hop=127.0.0.1:8787#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "agent": "/sessions/3fa85f64-5717-4562-b3fc-2c963f66afa6/agent?token=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+  }
+}
+```
+
 Store `sessionId`. Response also has `browserToken`, `agentToken`, `expiresAt`, `ttlSeconds`, and `joins`:
 
-- `joins.browser` — path on the hop Worker, token in the fragment (omit hop when HTML and Worker share an origin)
+- `joins.browser` — path on the hop Worker: `/?session=<id>&hop=<worker-host>#token=<browserToken>` (mint sets `hop` from the Worker Host). If the HTML is on another host, your app builds `https://remote.example.com/?session=<id>&hop=<worker-host>#token=<browserToken>`. Same origin: you can omit `hop`.
 - `joins.agent` — agent WebSocket path with query-token fallback
 
 ## Open the session (browser)
 
-The one browser join URL is:
+Same origin (HTML served by the Worker):
 
 ```
 https://remote.example.com/?session=<id>#token=<browserToken>
 ```
 
-That opens **Selkies chrome** (the product session UI). `hop` is the Worker host (`location.host` form). Omit it when the HTML and Worker share an origin. Built by `viewerPath` / `viewerQuery`.
+Split origin (HTML on `remote`, Worker elsewhere):
+
+```
+https://remote.example.com/?session=<id>&hop=<worker-host>#token=<browserToken>
+```
+
+That opens **Selkies chrome**. `hop` is the Worker host. Omit it when HTML and Worker share an origin. Mint `joins.browser` is the matching path on the Worker (`viewerPath`); if the HTML host differs, prefix `https://remote.example.com` and keep `hop`.
 
 `/viewer.html` is the canvas hole the chrome iframes. PartySocket `/parties/session/:id?role=browser&token=` is how that hole connects, not a second product join.
 
@@ -86,10 +120,12 @@ First-message join failures close the socket (`4003` invalid token, `4009` role 
 
 TTL alarm or either **joined** peer dropping ends the session. Later joins are rejected. A socket that never sent a join token does not tear the session down.
 
-## What stays with the consumer
+## What you keep vs the hop
 
+**Hop:** mint, 1:1 pair, forward opaque envelopes, hibernate, TTL teardown.
+
+**You keep:**
 - Anything beyond the mint secret and join tokens (users, tenants, Access)
 - Devices / identity / fleet agent
 - Capture encoding (JPEG/WebP stills recommended)
 - Applying opaque input JSON on the device
-- Session UI is this repo's `/` (Selkies chrome)

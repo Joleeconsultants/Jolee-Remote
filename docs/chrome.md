@@ -1,6 +1,6 @@
 # Dashboard chrome
 
-`/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop. 
+`/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop.
 
 `/viewer.html` is the canvas hole: PartySocket, byte envelope, canvas paint, pointer/key input, and postMessage. No header, no Connect button, no status pill.
 
@@ -16,14 +16,19 @@ The one browser join URL opens Selkies chrome:
 https://remote.example.com/?session=<id>#token=<browserToken>
 ```
 
+If the Worker is a different host:
+
+```
+https://remote.example.com/?session=<id>&hop=<worker-host>#token=<browserToken>
+```
+
 | param | meaning |
 | --- | --- |
 | `session` | session id from `POST /sessions` |
 | `token` | browser join token (prefer `#token=` fragment; `?token=` is fallback) |
 | `hop` | Worker host; default this origin. The HTML page is what we recommend on `remote` (`remote.example.com`) |
 
-`joins.browser` from mint is this path (`viewerPath` in `src/joins.ts`). `public/index.html` is a tiny shell: it copies the page search params onto `iframe#jolee-core` (`/viewer.html`). The hop core auto-connects from those params. A host app can also postMessage `connect` (and `disconnect`) to the iframe. There is no custom join form.
-
+`joins.browser` from mint is a path on the hop Worker (`viewerPath`): `/?session=<id>&hop=<worker-host>#token=<browserToken>`. If HTML is on `https://remote.example.com` and the Worker is elsewhere, prefix that origin and keep `hop`. `public/index.html` copies search params except `token` onto the iframe query, and puts the token on the iframe hash (hash first, then query fallback). The hop core auto-connects. A host app can also postMessage `connect` / `disconnect` to the iframe.
 
 ## postMessage contract
 
@@ -56,10 +61,9 @@ flowchart LR
   Agent[Outbound agent] -->|WebSocket client| DO
 ```
 
-
 ## Keeping chrome in sync
 
-This repo does not run Selkies and does not copy selkies-web-core.
+This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 
 Do not bump packages past what the source uses: dashboard npm follows the pinned Selkies package.json; wrangler, workers-types, partyserver, and partysocket follow those sources, not latest-on-npm.
 
