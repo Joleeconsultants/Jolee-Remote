@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   clipboardTextFromFrame,
   cursorFromFrame,
+  fileFromFrame,
   parseJsonFrameObject,
+  statsFromFrame,
 } from "../src/json-frame";
 
 function utf8(s: string): Uint8Array {
@@ -59,5 +61,18 @@ describe("json frames (clipboard + cursor)", () => {
     expect(cursorFromFrame(utf8('{"t":"clipboard","text":"no"}'))).toBeNull();
     expect(clipboardTextFromFrame(utf8('{"t":"cursor","visible":true}'))).toBeNull();
     expect(cursorFromFrame(utf8("placeholder-frame-1"))).toBeNull();
+  });
+
+  it("parses file downloads and optional agent stats", () => {
+    expect(fileFromFrame(utf8('{"t":"file","name":"report.txt","mime":"text/plain","data":"aGk="}'))).toEqual({
+      name: "report.txt",
+      mime: "text/plain",
+      data: "aGk=",
+    });
+    expect(statsFromFrame(utf8('{"t":"stats","fps":30,"system":{"cpu_percent":12}}'))).toEqual({
+      t: "stats",
+      fps: 30,
+      system: { cpu_percent: 12 },
+    });
   });
 });

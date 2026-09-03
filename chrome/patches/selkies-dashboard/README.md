@@ -19,6 +19,11 @@ The series rewires Selkies chrome onto the hop canvas. Add chrome back as the ho
 - Screen (scale, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution)
 - PC Clipboard (open by default), text + image (`enable_binary_clipboard` unlocked)
 - Audio playback (envelope kind `0x03` agent → browser)
+- Microphone capture (`{t:"mic", mime, data}` browser → agent)
+- Files (`{t:"file", name, mime, data}` in either direction)
+- Webcam JPEG stills (`{t:"webcam", mime, data}` browser → agent)
+- Sidebar stats (measured hop FPS/bandwidth plus optional agent stats JSON)
+- Shortcuts and agent-owned encoder / quality settings
 - Fullscreen and theme
 - Mobile/touch keyboard FAB (original Selkies; not in the sidebar)
 
@@ -26,14 +31,8 @@ Image clipboard stays on input JSON / JSON frame. Cursor shape is the same JSON-
 
 ## Leftover (recommended features not yet hopped)
 
-- Microphone (browser → agent audio)
-- Files
 - Apps
 - Sharing
-- Webcam
-- Stats
-- Shortcuts
-- Encoder / video settings (no pixelflux on this hop; agent owns capture encode)
 - Gaming (out unless asked)
 
 ## Overlay vs patches

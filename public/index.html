@@ -13,8 +13,9 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
 </style>
 </head>
 <body>
-<iframe id="jolee-core" title="Session hop core" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+<iframe id="jolee-core" title="Session hop core" allow="fullscreen; clipboard-read; clipboard-write; microphone; camera"></iframe>
 <input id="keyboard-input-assist" type="text" autocomplete="off" aria-hidden="true">
+<input id="jolee-file-upload" type="file" hidden>
 <div id="root"></div>
 <script>
 (function () {
@@ -28,6 +29,7 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
   var iframe = document.getElementById("jolee-core");
   iframe.src = src;
   var assist = document.getElementById("keyboard-input-assist");
+  var fileUpload = document.getElementById("jolee-file-upload");
   function postToCore(msg) {
     if (iframe && iframe.contentWindow) {
       iframe.contentWindow.postMessage(msg, location.origin);
@@ -41,6 +43,24 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
   });
   assist.addEventListener("keyup", function (e) {
     postToCore({ type: "assistKey", e: "up", key: e.key, code: e.code });
+  });
+  window.addEventListener("requestFileUpload", function () {
+    fileUpload.click();
+  });
+  fileUpload.addEventListener("change", function () {
+    var file = fileUpload.files && fileUpload.files[0];
+    if (file) postToCore({ type: "fileUpload", file: file });
+    fileUpload.value = "";
+  });
+  window.addEventListener("message", function (event) {
+    if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
+    var msg = event.data;
+    if (!msg || typeof msg !== "object" || msg.type !== "statsUpdate") return;
+    window.system_stats = msg.system_stats || {};
+    window.gpu_stats = msg.gpu_stats || null;
+    window.fps = Number.isFinite(msg.fps) ? msg.fps : 0;
+    window.network_stats = msg.network_stats || {};
+    window.currentAudioLevel = Number.isFinite(msg.currentAudioLevel) ? msg.currentAudioLevel : 0;
   });
 })();
 </script>

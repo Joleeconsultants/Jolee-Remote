@@ -60,12 +60,15 @@ Same-origin `window` messages from the parent shell to `iframe#jolee-core`.
 | `assistKey` | `{e, key, code}` | input envelope `{t:key,...}` from parent `#keyboard-input-assist` |
 | `clipboardUpdateFromUI` | `{text}` | input envelope `{t:clipboard, text}` if connected |
 | `clipboardImageUpdate` | `{imageBlob}` | Blob/File from the sidebar; viewer base64-encodes and sends `{t:clipboard, mime, data}` if the envelope is ≤ 1 MiB |
+| `fileUpload` | `{file}` | base64-encode a parent-picked File and send `{t:"file", name, mime, data}` if the envelope is ≤ 1 MiB |
 | `pipelineControl` | `{pipeline, enabled}` | `audio`: mute / stop playback. Also input `{t:pipeline, pipeline, enabled}` |
 | `audioDeviceSelected` | `{context, deviceId}` | output uses `setSinkId` if present; also `sendInput({t:"audioDevice", context, deviceId})` |
 | `setManualResolution` | `{width, height}` | `sendInput({t:"resize", w, h})` |
 | `resetResolutionToWindow` | | `sendInput({t:"resize", w:round(innerWidth), h:round(innerHeight), reset:true})` |
 | `setUseCssScaling` | `{value: boolean}` | `sendInput({t:"cssScaling", value})` |
 | `settings` | `{settings}` | if present, `sendInput({t:"settings", settings})` covering `scaling_dpi` and `force_aligned_resolution` |
+| `command` | command payload | input `{t:"command", ...}`; Ctrl+Alt+Del spellings normalize to `command:"ctrl-alt-delete"` |
+| `getStats` | | immediately publish the current hop/agent stats snapshot |
 
 Core to parent (only when window.parent is not window):
 
@@ -74,21 +77,17 @@ Core to parent (only when window.parent is not window):
 | `status` | `{state: waiting | paired | expired | disconnected}` |
 | `clipboardContentUpdate` | `{text}` — viewer saw a frame whose payload is UTF-8 JSON `{"t":"clipboard","text":"..."}`. Hop does not parse it. |
 | `clipboardImageUpdate` | `{mime, data}` — viewer saw a JSON clipboard frame with `mime` starting `image/` and base64 `data`. Sidebar may ignore this. |
+| `pipelineStatusUpdate` | microphone/webcam active state after permission and capture start/stop |
+| `statsUpdate` | dashboard globals for CPU, memory, GPU, FPS, bandwidth, latency, and audio level |
 
 ## What's left
 
-**Visible now:** screen (scale locally, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback (kind `0x03`), fullscreen, theme, mobile keyboard. Overlay is hop core; CSS cursors is original UI.
+**Visible now:** screen and agent-owned encoder/quality settings, PC clipboard text+image, audio playback, microphone capture, file upload/download, webcam JPEG stills, stats gauges, shortcuts, fullscreen, theme, and mobile keyboard. Overlay is hop core; CSS cursors is original UI. There is no pixelflux.
 
 **Hidden until that hop exists** (leftover list):
 
-- Microphone (browser → agent audio)
-- Files
 - Apps
 - Sharing
-- Webcam
-- Stats
-- Shortcuts
-- Encoder / video settings (no pixelflux on this hop; agent owns capture encode)
 - Gaming (out unless asked)
 
 Gaming (gamepads, gaming mode, trackpad, extra player seats) stays hidden. Image clipboard is unlocked: it is a hop JSON path, not a Selkies pixelflux encoder. A leftover postMessage of still-hidden types is ignored so a stale build cannot crash the core.
