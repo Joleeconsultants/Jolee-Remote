@@ -152,7 +152,7 @@ Frames and audio stay agent → browser. Input stays browser → agent.
 
 Apps and sharing have no hop yet. Gaming stays out unless asked. Encoder / video settings belong to the capture agent; there is no pixelflux on this hop.
 
-Visible chrome after this hop: screen and agent-owned encoder/quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, shortcuts, fullscreen, theme, and mobile keyboard.
+Visible chrome after this hop: screen and agent-owned encoder/frame-rate/JPEG-quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, a Ctrl+Alt+Del shortcut, fullscreen, theme, and mobile keyboard. Paint-over and other Selkies-only encoder controls remain hidden.
 
 ### Max binary message size
 
