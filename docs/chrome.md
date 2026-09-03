@@ -82,7 +82,7 @@ Core to parent (only when window.parent is not window):
 
 ## What's left
 
-**Visible now:** screen and agent-owned encoder/quality settings, PC clipboard text+image, audio playback, microphone capture, file upload/download, webcam JPEG stills, stats gauges, shortcuts, fullscreen, theme, and mobile keyboard. Overlay is hop core; CSS cursors is original UI. There is no pixelflux.
+**Visible now:** screen and agent-owned encoder/frame-rate/JPEG-quality settings, PC clipboard text+image, audio playback, microphone capture, file upload/download, webcam JPEG stills, stats gauges, a Ctrl+Alt+Del shortcut, fullscreen, theme, and mobile keyboard. Paint-over and the other Selkies-only encoder controls stay hidden. Overlay is hop core; CSS cursors is original UI. There is no pixelflux.
 
 **Hidden until that hop exists** (leftover list):
 
