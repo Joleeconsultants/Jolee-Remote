@@ -41,6 +41,9 @@ let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true, antiAliasing=true;
 let audioEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
+let microphoneStream=null, microphoneRecorder=null, webcamStream=null, webcamTimer=null;
+let frameCount=0, statsStartedAt=performance.now(), bytesSinceStats=0;
+let agentStats={};
 // Remote overlay is the default (Selkies idea). CSS cursors toggle (original UI) switches to a local pointer.
 let useBrowserCursors=false, pointerOver=false, agentCursorVisible=true;
 let cursorHx=DEFAULT_CURSOR_HX, cursorHy=DEFAULT_CURSOR_HY;
@@ -80,6 +83,17 @@ function parseJsonFrameObject(payload){
     if(!(obj&&typeof obj==="object")) return null;
     return obj;
   }catch(e){return null;}
+}
+function fileFromFrame(payload){
+  const obj=parseJsonFrameObject(payload);
+  if(!obj||!(obj.t==="file"||obj.type==="file")) return null;
+  if(typeof obj.name!=="string"||typeof obj.data!=="string") return null;
+  return {name:obj.name,mime:typeof obj.mime==="string"?obj.mime:"application/octet-stream",data:obj.data};
+}
+function statsFromFrame(payload){
+  const obj=parseJsonFrameObject(payload);
+  if(!obj||!(obj.t==="stats"||obj.type==="stats")) return null;
+  return obj;
 }
 function clipboardTextFromFrame(payload){
   const obj=parseJsonFrameObject(payload);
@@ -133,8 +147,8 @@ function moveOverlay(e){
   const r=stage.getBoundingClientRect();
   cursorEl.style.transform="translate("+(e.clientX-r.left-cursorHx)+"px,"+(e.clientY-r.top-cursorHy)+"px)";
 }
-async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;applySmoothing();ctx.drawImage(bitmap,0,0);bitmap.close();}
-async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;applySmoothing();ctx.drawImage(frame,0,0);frame.close();},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
+async function paintJpegOrPng(payload){const bitmap=await createImageBitmap(new Blob([payload]));canvas.width=bitmap.width;canvas.height=bitmap.height;applySmoothing();ctx.drawImage(bitmap,0,0);bitmap.close();frameCount++;}
+async function paintH264(payload){if(typeof VideoDecoder==="undefined")throw new Error("no WebCodecs");if(!videoDecoder||videoDecoder.state==="closed"){videoDecoder=new VideoDecoder({output:(frame)=>{canvas.width=frame.displayWidth;canvas.height=frame.displayHeight;applySmoothing();ctx.drawImage(frame,0,0);frame.close();frameCount++;},error:()=>{}});videoDecoder.configure({codec:"avc1.42E01E"});}videoDecoder.decode(new EncodedVideoChunk({type:payload.length>4&&payload[4]===5?"key":"delta",timestamp:performance.now()*1000,data:payload}));}
 async function paintFrame(payload){try{await paintJpegOrPng(payload);return;}catch(e){}try{await paintH264(payload);}catch(e){ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#888";ctx.fillText("opaque frame "+payload.length+" bytes",16,24);}}
 function revokeAudioUrl(){
   if(audioUrl){try{URL.revokeObjectURL(audioUrl);}catch(e){}audioUrl=null;}
@@ -147,6 +161,75 @@ function stopAudioPlayback(){
     playingAudio=null;
   }
   revokeAudioUrl();
+}
+function postPipelineStatus(pipeline,enabled){
+  if(window.parent!==window) window.parent.postMessage({type:"pipelineStatusUpdate",[pipeline]:!!enabled},window.location.origin);
+}
+function stopMicrophone(){
+  if(microphoneRecorder&&microphoneRecorder.state!=="inactive") try{microphoneRecorder.stop();}catch(e){}
+  microphoneRecorder=null;
+  if(microphoneStream) microphoneStream.getTracks().forEach((track)=>track.stop());
+  microphoneStream=null;
+  postPipelineStatus("microphone",false);
+}
+async function setMicrophoneEnabled(enabled){
+  if(!enabled){stopMicrophone();return;}
+  if(microphoneRecorder&&microphoneRecorder.state==="recording") return;
+  try{
+    microphoneStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
+    const mime=preferred.find((type)=>typeof MediaRecorder!=="undefined"&&MediaRecorder.isTypeSupported(type))||"";
+    microphoneRecorder=new MediaRecorder(microphoneStream,mime?{mimeType:mime}:undefined);
+    microphoneRecorder.addEventListener("dataavailable",async(event)=>{
+      if(!event.data||!event.data.size) return;
+      const data=bytesToBase64(new Uint8Array(await event.data.arrayBuffer()));
+      sendInput({t:"mic",mime:event.data.type||microphoneRecorder?.mimeType||"audio/webm",data});
+    });
+    microphoneRecorder.addEventListener("stop",()=>postPipelineStatus("microphone",false),{once:true});
+    microphoneRecorder.start(250);
+    postPipelineStatus("microphone",true);
+  }catch(e){stopMicrophone();}
+}
+function stopWebcam(){
+  if(webcamTimer!==null) clearInterval(webcamTimer);
+  webcamTimer=null;
+  if(webcamStream) webcamStream.getTracks().forEach((track)=>track.stop());
+  webcamStream=null;
+  postPipelineStatus("webcam",false);
+}
+async function setWebcamEnabled(enabled){
+  if(!enabled){stopWebcam();return;}
+  if(webcamStream) return;
+  try{
+    webcamStream=await navigator.mediaDevices.getUserMedia({video:true});
+    const video=document.createElement("video");
+    video.muted=true; video.playsInline=true; video.srcObject=webcamStream;
+    await video.play();
+    const still=document.createElement("canvas"), stillCtx=still.getContext("2d");
+    const capture=()=>{
+      if(!webcamStream||video.readyState<2) return;
+      still.width=video.videoWidth||640; still.height=video.videoHeight||480;
+      stillCtx.drawImage(video,0,0,still.width,still.height);
+      still.toBlob(async(blob)=>{
+        if(!blob||!webcamStream) return;
+        const data=bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+        sendInput({t:"webcam",mime:"image/jpeg",data});
+      },"image/jpeg",0.8);
+    };
+    capture(); webcamTimer=setInterval(capture,500);
+    postPipelineStatus("webcam",true);
+  }catch(e){stopWebcam();}
+}
+function downloadFile(file){
+  try{
+    const raw=atob(file.data), bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:file.mime}));
+    const link=document.createElement("a");
+    link.href=url; link.download=file.name; link.style.display="none";
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){}
 }
 function applyAudioSink(el){
   if(!el || !audioSinkId) return;
@@ -181,7 +264,7 @@ async function playAudioChunk(payload){
     }
   }
 }
-function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();setStatus("disconnected");}
+function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();stopMicrophone();stopWebcam();setStatus("disconnected");}
 function connect(opts){
   if(opts&&typeof opts==="object"){
     if(typeof opts.session==="string") session=opts.session;
@@ -211,6 +294,7 @@ function connect(opts){
     }
     const env=decodeEnvelope(ev.data);
     if(!env) return;
+    bytesSinceStats+=env.payload.length+2;
     if(env.kind==="audio"){playAudioChunk(env.payload);return;}
     if(env.kind!=="frame") return;
     const clip=clipboardTextFromFrame(env.payload);
@@ -229,10 +313,14 @@ function connect(opts){
       applyCursorFrame(cur);
       return;
     }
+    const file=fileFromFrame(env.payload);
+    if(file!==null){downloadFile(file);return;}
+    const stats=statsFromFrame(env.payload);
+    if(stats!==null){agentStats=stats;postStats();return;}
     paintFrame(env.payload);
   });
 }
-function sendInput(payload){if(!socket||socket.readyState!==1)return;socket.send(encodeInput(payload));}
+function sendInput(payload){if(!socket||socket.readyState!==1)return;const encoded=encodeInput(payload);if(encoded.length>MAX_ENVELOPE_BYTES)return;socket.send(encoded);}
 function requestFullscreen(){
   const el=stage;
   const req=el.requestFullscreen||el.webkitRequestFullscreen;
@@ -264,6 +352,37 @@ async function clipboardImageUpdateFromUI(blob){
     socket.send(encoded);
   }catch(e){}
 }
+async function sendFile(blob){
+  if(!(blob instanceof Blob)) return;
+  try{
+    const data=bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+    const encoded=encodeInput({t:"file",name:typeof blob.name==="string"?blob.name:"upload",mime:blob.type||"application/octet-stream",data});
+    if(encoded.length>MAX_ENVELOPE_BYTES||!socket||socket.readyState!==1) return;
+    socket.send(encoded);
+  }catch(e){}
+}
+function numberOr(value,fallback=0){return typeof value==="number"&&isFinite(value)?value:fallback;}
+function postStats(){
+  const now=performance.now(), elapsed=Math.max(1,now-statsStartedAt);
+  const hopFps=frameCount*1000/elapsed;
+  const hopBandwidth=bytesSinceStats*8/elapsed/1000;
+  const system=agentStats.system_stats||agentStats.system||{
+    cpu_percent:numberOr(agentStats.cpu_percent,0),
+    mem_used:numberOr(agentStats.mem_used,0),
+    mem_total:numberOr(agentStats.mem_total,0)
+  };
+  const hasFlatGpu=agentStats.gpu_percent!==undefined||agentStats.gpu_mem_used!==undefined||agentStats.gpu_mem_total!==undefined;
+  const gpu=agentStats.gpu_stats||agentStats.gpu||(hasFlatGpu?{
+    gpu_percent:numberOr(agentStats.gpu_percent,0),
+    mem_used:numberOr(agentStats.gpu_mem_used,0),
+    mem_total:numberOr(agentStats.gpu_mem_total,0)
+  }:null);
+  const network=Object.assign({bandwidth_mbps:numberOr(agentStats.bandwidth_mbps,hopBandwidth),latency_ms:numberOr(agentStats.latency_ms,0)},agentStats.network_stats||agentStats.network||{});
+  const stats={type:"statsUpdate",system_stats:system,gpu_stats:gpu,fps:numberOr(agentStats.fps,hopFps),network_stats:network,currentAudioLevel:numberOr(agentStats.currentAudioLevel??agentStats.audio_level,0)};
+  if(window.parent!==window) window.parent.postMessage(stats,window.location.origin);
+  frameCount=0; bytesSinceStats=0; statsStartedAt=now;
+}
+setInterval(postStats,1000);
 canvas.addEventListener("pointermove",(e)=>{
   pointerOver=true;
   moveOverlay(e);
@@ -322,6 +441,7 @@ window.addEventListener("message",(event)=>{
     case "clipboardImageUpdate":
       clipboardImageUpdateFromUI(msg.imageBlob);
       break;
+    case "fileUpload": sendFile(msg.file); break;
     case "assistKey":
       sendInput({t:"key",e:msg.e==="up"?"up":"down",key:msg.key,code:msg.code});
       break;
@@ -335,6 +455,8 @@ window.addEventListener("message",(event)=>{
       break;
     case "pipelineControl":
       if(msg.pipeline==="audio") setAudioEnabled(!!msg.enabled);
+      if(msg.pipeline==="microphone") setMicrophoneEnabled(!!msg.enabled);
+      if(msg.pipeline==="webcam") setWebcamEnabled(!!msg.enabled);
       if(typeof msg.pipeline==="string") sendInput({t:"pipeline",pipeline:msg.pipeline,enabled:!!msg.enabled});
       break;
     case "audioDeviceSelected":
@@ -358,12 +480,18 @@ window.addEventListener("message",(event)=>{
     case "settings":
       if(msg.settings) sendInput({t:"settings",settings:msg.settings});
       break;
-    // Hidden until hop exists: microphone, files, apps, sharing, webcam, stats, shortcuts, encoder/video.
+    case "command": {
+      const value=String(msg.value??msg.command??msg.payload?.command??"");
+      const compact=value.toLowerCase().replace(/[^a-z]/g,"");
+      if(compact==="ctrlaltdel"||compact==="ctrlaltdelete") sendInput({t:"command",command:"ctrl-alt-delete"});
+      else sendInput(Object.assign({t:"command"},msg));
+      break;
+    }
+    case "getStats": postStats(); break;
+    // Apps and Sharing stay hidden. Gaming stays noop. Pointer lock is not used.
     // Gaming stays noop. Pointer lock is not used.
     case "gamepadControl":
     case "requestGamingMode":
-    case "command":
-    case "getStats":
     case "sidebarVisibilityChanged":
     case "TOUCH_GAMEPAD_SETUP":
     case "TOUCH_GAMEPAD_VISIBILITY":

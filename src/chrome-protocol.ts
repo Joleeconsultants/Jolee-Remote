@@ -14,13 +14,14 @@ export const HANDLED_DASHBOARD_TYPES = [
   "resetResolutionToWindow",
   "setUseCssScaling",
   "settings",
+  "fileUpload",
+  "command",
+  "getStats",
 ] as const;
 
 export const NOOP_DASHBOARD_TYPES = [
   "gamepadControl",
   "requestGamingMode",
-  "command",
-  "getStats",
   "sidebarVisibilityChanged",
   "TOUCH_GAMEPAD_SETUP",
   "TOUCH_GAMEPAD_VISIBILITY",
@@ -46,6 +47,9 @@ export type DashboardAction =
   | "resetResolutionToWindow"
   | "setUseCssScaling"
   | "settings"
+  | "fileUpload"
+  | "command"
+  | "getStats"
   | "noop"
   | "ignore";
 

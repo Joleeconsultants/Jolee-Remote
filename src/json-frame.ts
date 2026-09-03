@@ -71,3 +71,24 @@ export function cursorFromFrame(payload: Uint8Array): CursorFrame | null {
   const data = typeof obj.data === "string" ? obj.data : "";
   return { visible: obj.visible !== false, hx, hy, mime, data };
 }
+
+export type FileFrame = { name: string; mime: string; data: string };
+
+export function fileFromFrame(payload: Uint8Array): FileFrame | null {
+  const obj = parseJsonFrameObject(payload);
+  if (!obj || !(obj.t === "file" || obj.type === "file")) return null;
+  if (typeof obj.name !== "string" || typeof obj.data !== "string") return null;
+  return {
+    name: obj.name,
+    mime: typeof obj.mime === "string" ? obj.mime : "application/octet-stream",
+    data: obj.data,
+  };
+}
+
+export function statsFromFrame(
+  payload: Uint8Array,
+): Record<string, unknown> | null {
+  const obj = parseJsonFrameObject(payload);
+  if (!obj || !(obj.t === "stats" || obj.type === "stats")) return null;
+  return obj;
+}

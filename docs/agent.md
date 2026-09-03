@@ -119,6 +119,10 @@ The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSO
 - `{t:"settings", settings}` — sidebar settings object (DPI, force aligned, …)
 - `{t:"audioDevice", context, deviceId}` — original audio panel device select
 - `{t:"pipeline", pipeline, enabled}` — chrome pipeline toggle (`audio` mutes playback in the viewer)
+- `{t:"mic", mime, data}` — browser microphone `MediaRecorder` chunk; `data` is base64
+- `{t:"file", name, mime, data}` — browser-selected upload; `data` is base64
+- `{t:"webcam", mime:"image/jpeg", data}` — periodic browser webcam JPEG still; `data` is base64
+- `{t:"command", command:"ctrl-alt-delete"}` — normalized secure-attention shortcut; other command payloads are forwarded
 
 To fill the sidebar PC Clipboard, the agent may send a *frame* envelope whose payload is UTF-8 JSON (not pixels). The hop does not parse it; the viewer does:
 
@@ -133,6 +137,11 @@ The same JSON-frame pattern carries the remote cursor *shape* (not pointer posit
 
 Pointer / key / wheel remain **input** JSON (browser → agent). Cursor JSON is a **frame** (agent → browser). CSS cursors toggle (original dashboard UI) hides the overlay and uses a normal local pointer; default is the remote overlay (`canvas.style.cursor='none'`).
 
+An agent can send two more JSON frame shapes:
+
+- `{t:"file", name, mime, data}` — trigger a browser download from base64 data
+- `{t:"stats", system_stats, gpu_stats, fps, network_stats, currentAudioLevel}` — optionally fill the CPU, memory, GPU, latency, and audio gauges. `system`/`gpu`/`network` and `audio_level` aliases are accepted. The viewer measures FPS and bandwidth when those fields are absent.
+
 A consumer applies pointer/key/wheel to the OS. Windows SendInput is out of this repo. Sample `examples/agent.mjs` proves the pipe + can send one cursor bitmap; it only logs input.
 
 Image clipboard and cursor stay on input JSON / JSON frame (kind `0x02` / kind `0x01`). Do not invent extra envelope kinds except audio `0x03`: audio is a byte stream like frames, so it is its own kind. The hop does not decode codecs. The viewer plays kind `0x03` as a complete media chunk (`Blob` + `Audio`; tries `audio/webm`, `ogg`, `wav`, `mpeg`).
@@ -141,9 +150,9 @@ Frames and audio stay agent → browser. Input stays browser → agent.
 
 ### Leftover (no hop yet)
 
-Microphone (browser → agent audio), files, apps, sharing, webcam, stats, shortcuts, encoder / video settings (no pixelflux on this hop; agent owns capture encode). Gaming stays out unless asked.
+Apps and sharing have no hop yet. Gaming stays out unless asked. Encoder / video settings belong to the capture agent; there is no pixelflux on this hop.
 
-Visible chrome after this hop: screen (scale, AA, CSS cursors toggle, remote cursor overlay, HiDPI, force aligned, UI scaling, resolution), PC clipboard text+image, audio playback, fullscreen, theme, mobile keyboard.
+Visible chrome after this hop: screen and agent-owned encoder/quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, shortcuts, fullscreen, theme, and mobile keyboard.
 
 ### Max binary message size
 

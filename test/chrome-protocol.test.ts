@@ -24,13 +24,14 @@ describe("dashboard postMessage protocol", () => {
     expect(classifyDashboardMessage({ type: "resetResolutionToWindow" })).toBe("resetResolutionToWindow");
     expect(classifyDashboardMessage({ type: "setUseCssScaling", value: true })).toBe("setUseCssScaling");
     expect(classifyDashboardMessage({ type: "settings", settings: { scaling_dpi: 96 } })).toBe("settings");
+    expect(classifyDashboardMessage({ type: "fileUpload" })).toBe("fileUpload");
+    expect(classifyDashboardMessage({ type: "command", value: "ctrl-alt-delete" })).toBe("command");
+    expect(classifyDashboardMessage({ type: "getStats" })).toBe("getStats");
   });
 
   it("no-ops chrome that has no hop yet", () => {
-    expect(classifyDashboardMessage({ type: "command", value: "ls" })).toBe("noop");
     expect(classifyDashboardMessage({ type: "gamepadControl", enabled: true })).toBe("noop");
     expect(classifyDashboardMessage({ type: "requestGamingMode" })).toBe("noop");
-    expect(classifyDashboardMessage({ type: "getStats" })).toBe("noop");
   });
 
   it("ignores malformed payloads", () => {
