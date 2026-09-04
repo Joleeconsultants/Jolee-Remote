@@ -142,7 +142,6 @@ function sendBurst() {
       t: "stats",
       cpu: 1.2,
       fps: 3,
-      hostname: "SMOKE-PC",
       note: "smoke-stats",
     }),
   );

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Jolee AI</title>
+<title>Jolee Remote</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="/dashboard/dashboard.css?v=jo-blue-2" />
 <style>
@@ -52,18 +52,6 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
     if (file) postToCore({ type: "fileUpload", file: file });
     fileUpload.value = "";
   });
-  function pickPcName(msg) {
-    var sys = msg.system_stats || {};
-    var candidates = [
-      msg.hostname, msg.computer_name, msg.pc_name, msg.device_name,
-      sys.hostname, sys.computer_name, sys.pc_name, sys.device_name, sys.name
-    ];
-    for (var i = 0; i < candidates.length; i++) {
-      var v = candidates[i];
-      if (typeof v === "string" && v.trim()) return v.trim();
-    }
-    return "";
-  }
   window.addEventListener("message", function (event) {
     if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
     var msg = event.data;
@@ -73,8 +61,6 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
     window.fps = Number.isFinite(msg.fps) ? msg.fps : 0;
     window.network_stats = msg.network_stats || {};
     window.currentAudioLevel = Number.isFinite(msg.currentAudioLevel) ? msg.currentAudioLevel : 0;
-    var pc = pickPcName(msg);
-    if (pc) document.title = pc;
   });
 })();
 </script>

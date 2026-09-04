@@ -52,7 +52,11 @@
   --gamepad-stick-top-stroke: #0369a1;
 }
 
-/* Keep sidebar wordmark on one row next to theme/fullscreen controls. */
+/* Keep sidebar wordmark on one row; reserve scrollbar so open sections don't squeeze it. */
+.sidebar {
+  width: 280px;
+  scrollbar-gutter: stable;
+}
 .sidebar-header {
   flex-wrap: nowrap;
 }
@@ -66,9 +70,4 @@
 }
 .sidebar-header .header-controls {
   flex: 0 0 auto;
-}
-
-/* Slightly wider drawer so "Jolee Remote" fits beside theme/fullscreen. */
-.sidebar {
-  width: 300px;
 }
