@@ -973,7 +973,7 @@ function Sidebar() {
   const [availablePlacements, setAvailablePlacements] = useState(null);
   const [serverSettings, setServerSettings] = useState(JOLEE_SERVER_SETTINGS);
 
-  const [uiTitle, setUiTitle] = useState('Jolee Remote');
+  const [uiTitle, setUiTitle] = useState('Jolee AI');
   const [uiShowLogo, setUiShowLogo] = useState(false);
 
   useEffect(() => {

@@ -19,16 +19,16 @@
        toggle, an error row) are lighter again. Accent as text is therefore a
        separate, lighter tint of the same hue — the fill colour is too dark
        against those surfaces at label sizes. */
-    --accent: #ec4899;
-    --accent-strong: #f472b6;
-    --accent-text: #f9a8d4;
-    --accent-text-strong: #fbc0de;
-    --accent-soft: rgba(236, 72, 153, 0.14);
-    --accent-border: rgba(236, 72, 153, 0.45);
-    --violet: #c3b1f7;
-    --violet-strong: #cdc0fa;
-    --wordmark-from: #f4a6cf;
-    --wordmark-to: #c3b1f7;
+    --accent: #0098e8;
+    --accent-strong: #12aaed;
+    --accent-text: #7dd3fc;
+    --accent-text-strong: #bae6fd;
+    --accent-soft: rgba(0, 152, 232, 0.16);
+    --accent-border: rgba(0, 152, 232, 0.5);
+    --violet: #38bdf8;
+    --violet-strong: #7dd3fc;
+    --wordmark-from: #5ec8f5;
+    --wordmark-to: #0689cf;
     --bg: #12161d;
     --surface: #181d26;
     --surface-alt: #1f2530;
@@ -58,7 +58,7 @@
     --input-border: var(--border-strong);
     /* A filled button carries near-black text, so its pink is lighter again
        than the accent that only has to sit on a dark surface. */
-    --button-bg: #f795ca;
+    --button-bg: #38bdf8;
     --button-text: #12161d;
     --button-hover-bg: var(--accent-text);
     --link-color: var(--violet);
@@ -92,28 +92,28 @@
     /* Gamepad visualizer */
     --gamepad-shell-fill: #2a313d;
     --gamepad-shell-stroke: #3d4653;
-    --gamepad-pad-fill: #b0568c;
-    --gamepad-pad-stroke: #d883b4;
-    --gamepad-pad-pressed-fill: #ff97cd;
-    --gamepad-stick-base-fill: #6d4a60;
-    --gamepad-stick-top-fill: #8f81d3;
-    --gamepad-stick-top-stroke: #ada0f5;
+    --gamepad-pad-fill: #0284c7;
+    --gamepad-pad-stroke: #38bdf8;
+    --gamepad-pad-pressed-fill: #7dd3fc;
+    --gamepad-stick-base-fill: #0c4a6e;
+    --gamepad-stick-top-fill: #0ea5e9;
+    --gamepad-stick-top-stroke: #7dd3fc;
 }
 
 /* Light Theme */
 .theme-light {
     /* On a light surface the accent has to go the other way to carry text, so
        --accent-text is darker than the fill rather than lighter. */
-    --accent: #a82a69;
-    --accent-strong: #8f2359;
+    --accent: #0284c7;
+    --accent-strong: #0369a1;
     --accent-text: var(--accent);
     --accent-text-strong: var(--accent-strong);
-    --accent-soft: rgba(168, 42, 105, 0.1);
-    --accent-border: rgba(168, 42, 105, 0.4);
-    --violet: #5b4ba3;
-    --violet-strong: #4a3c87;
-    --wordmark-from: #b93a82;
-    --wordmark-to: #7b52b0;
+    --accent-soft: rgba(2, 132, 199, 0.12);
+    --accent-border: rgba(2, 132, 199, 0.4);
+    --violet: #0369a1;
+    --violet-strong: #075985;
+    --wordmark-from: #0ea5e9;
+    --wordmark-to: #0369a1;
     --bg: #f4f5f8;
     --surface: #ffffff;
     --surface-alt: #f6f7f9;
@@ -166,12 +166,12 @@
 
     --gamepad-shell-fill: #c6cad3;
     --gamepad-shell-stroke: #9aa1ad;
-    --gamepad-pad-fill: #c95796;
-    --gamepad-pad-stroke: #a42c73;
-    --gamepad-pad-pressed-fill: #a3136f;
-    --gamepad-stick-base-fill: #dcafc4;
-    --gamepad-stick-top-fill: #8071c8;
-    --gamepad-stick-top-stroke: #5e4da1;
+    --gamepad-pad-fill: #0284c7;
+    --gamepad-pad-stroke: #0369a1;
+    --gamepad-pad-pressed-fill: #075985;
+    --gamepad-stick-base-fill: #bae6fd;
+    --gamepad-stick-top-fill: #0ea5e9;
+    --gamepad-stick-top-stroke: #0369a1
 }
 
 /* --- Sidebar General Styles --- */

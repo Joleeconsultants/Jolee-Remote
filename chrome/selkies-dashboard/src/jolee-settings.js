@@ -21,7 +21,7 @@ function flag(value) {
 }
 
 export const JOLEE_SERVER_SETTINGS = {
-  ui_title: flag("Jolee Remote"),
+  ui_title: flag("Jolee AI"),
   ui_show_logo: flag(false),
   ui_sidebar_show_video_settings: flag(true),
   ui_sidebar_show_screen_settings: flag(true),

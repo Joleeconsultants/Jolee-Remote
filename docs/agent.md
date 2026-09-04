@@ -141,7 +141,7 @@ Pointer / key / wheel remain **input** JSON (browser → agent). Cursor JSON is 
 An agent can send more JSON frame shapes:
 
 - `{t:"file", name, mime, data}` — trigger a browser download from base64 data
-- `{t:"stats", system_stats, gpu_stats, fps, network_stats, currentAudioLevel}` — optionally fill the CPU, memory, GPU, latency, and audio gauges. `system`/`gpu`/`network` and `audio_level` aliases are accepted. The viewer measures FPS and bandwidth when those fields are absent.
+- `{t:"stats", hostname?, system_stats, gpu_stats, fps, network_stats, currentAudioLevel}` — optionally fill gauges. `hostname` / `computer_name` / `pc_name` (or under `system_stats`) sets the **browser tab** to the PC name; sidebar wordmark stays `ui_title` (Jolee AI). Aliases `system`/`gpu`/`network`/`audio_level` accepted. Viewer measures FPS/bandwidth when absent.
 - `{t:"print", mime, name, data}` — finished session print job (prefer `application/pdf` after agent PostScript→PDF). Optional chunking: `job`, `part`, `parts` where each `data` is base64 of a byte slice. Viewer opens browser print preview; see [print-redirect.md](print-redirect.md).
 
 A consumer applies pointer/key/wheel to the OS. Windows SendInput is out of this repo. Sample `examples/agent.mjs` proves the pipe + can send one cursor bitmap; it only logs input.
