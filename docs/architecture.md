@@ -1,6 +1,6 @@
 # Architecture
 
-Reusable Cloudflare Durable Objects session-pairing framework: mint, pair browser + outbound agent WebSocket, hibernation, TTL, teardown.
+Short-lived browser↔agent session pairing on Cloudflare Durable Objects.
 
 Session-pairing hop on Cloudflare Workers and Durable Objects. See the root README for integration. Diagrams below:
 

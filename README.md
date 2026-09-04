@@ -1,8 +1,8 @@
 # Jolee Remote
 
-Reusable Cloudflare Durable Objects session-pairing framework: mint, pair browser + outbound agent WebSocket, hibernation, TTL, teardown.
+Short-lived browser↔agent session pairing on Cloudflare Durable Objects.
 
-A session-pairing hop on Cloudflare Workers and Durable Objects. Mint a session, pair one browser WebSocket with one outbound agent WebSocket, forward opaque `frame` / `input` bytes, hibernate, and tear down on TTL or peer drop.
+Mint a session, pair one browser WebSocket with one outbound agent WebSocket, forward opaque `frame` / `input` bytes, hibernate, and tear down on TTL or peer drop.
 
 You bring auth, devices, and capture/agent logic. There is no hosted demo — deploy the Worker to your own Cloudflare account.
 
