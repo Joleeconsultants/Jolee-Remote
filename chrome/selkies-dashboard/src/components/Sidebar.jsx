@@ -2300,34 +2300,46 @@ function Sidebar() {
     resetHidpiToDerivedDefault();
     resetDpiToDerivedDefault();
   };
-  const handleVideoToggle = () =>
+  const handleVideoToggle = () => {
+    const enabled = !isVideoActive;
+    setIsVideoActive(enabled);
     postToCore(
-      { type: "pipelineControl", pipeline: "video", enabled: !isVideoActive },
+      { type: "pipelineControl", pipeline: "video", enabled },
       window.location.origin
     );
-  const handleAudioToggle = () =>
+  };
+  const handleAudioToggle = () => {
+    const enabled = !isAudioActive;
+    setIsAudioActive(enabled);
     postToCore(
-      { type: "pipelineControl", pipeline: "audio", enabled: !isAudioActive },
+      { type: "pipelineControl", pipeline: "audio", enabled },
       window.location.origin
     );
-  const handleMicrophoneToggle = () =>
+  };
+  const handleMicrophoneToggle = () => {
+    const enabled = !isMicrophoneActive;
+    setIsMicrophoneActive(enabled);
     postToCore(
       {
         type: "pipelineControl",
         pipeline: "microphone",
-        enabled: !isMicrophoneActive,
+        enabled,
       },
       window.location.origin
     );
-  const handleWebcamToggle = () =>
+  };
+  const handleWebcamToggle = () => {
+    const enabled = !isWebcamActive;
+    setIsWebcamActive(enabled);
     postToCore(
       {
         type: "pipelineControl",
         pipeline: "webcam",
-        enabled: !isWebcamActive,
+        enabled,
       },
       window.location.origin
     );
+  };
   const handleGamepadToggle = () =>
     postToCore(
       { type: "gamepadControl", enabled: !isGamepadEnabled },
