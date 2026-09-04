@@ -40,6 +40,13 @@ Image clipboard stays on input JSON / JSON frame. Cursor shape is the same JSON-
 - Overlay files listed in `chrome/selkies-dashboard/OVERLAY` are never overwritten by sync (`jolee-settings.js`, `jolee-bridge.js`, `jolee-shims/`, `jolee-theme.css`, …). Put hop-only hide-flags, brand CSS, and postMessage glue there.
 - Patches in this directory are rewires of vendored Selkies files (`Sidebar.jsx`, translations, …). Keep them small.
 
+### Brand + gutter (`jolee-theme.css`)
+
+- **JO blues** — company brand (not Selkies pink/violet).
+- **Always-on gutter** — `width: calc(280px + 8px)` + `scrollbar-gutter: stable` so **Jolee Remote** keeps title room and section toggles do not squeeze layout.
+- **Easy undo** — drop only that `.sidebar` gutter block if it bugs; keep blue tokens. Rebuild dashboard. No Sidebar patch to unwind.
+- Full note: [docs/chrome.md](../../../docs/chrome.md#brand-and-sidebar-gutter-overlay).
+
 ## Series
 
 | patch | why |

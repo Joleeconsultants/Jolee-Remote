@@ -20,6 +20,19 @@ Leftover list = recommended features not yet hopped, not a junk drawer. CSS curs
 
 The chrome only keeps controls the hop can actually drive. Add chrome back as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
+## Brand and sidebar gutter (overlay)
+
+Keep UI diffs tiny and easy to undo. Brand and layout tweaks live in overlay [`chrome/selkies-dashboard/src/jolee-theme.css`](../chrome/selkies-dashboard/src/jolee-theme.css) (listed in `OVERLAY`; sync does not overwrite it). Loaded after Selkies `Overlay.css` via patch `0012-jolee-theme-import.patch`.
+
+| What | Why |
+| --- | --- |
+| JO blue tokens | Company brand colors (replace Selkies pink/violet accents) |
+| `.sidebar { width: calc(280px + 8px); scrollbar-gutter: stable; }` | Always-on gutter so the long title **Jolee Remote** keeps room and opening/closing sections does not squeeze content |
+
+Do **not** add dynamic gutter JS or large Sidebar rewrites for this. Prefer stock Selkies chrome with these small CSS mods.
+
+**Undo if buggy:** delete only the `.sidebar { … scrollbar-gutter … }` block in `jolee-theme.css` (keep the blue tokens if you still want brand). Rebuild the dashboard (`npm run build:dashboard`). No Sidebar patch to reverse.
+
 ## Join
 
 The one browser join URL opens Selkies chrome:
