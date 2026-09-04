@@ -1,55 +1,74 @@
-# Session-scoped print redirect (parked)
+# Session-scoped print redirect
 
-**Status:** not implemented. A possible later hop + consumer feature.
+**Status:** **viewer side shipped** in this repo (`public/viewer.html` + `printFromFrame` in `src/json-frame.ts`). The **session-only virtual printer** (appear on pair, remove on teardown) remains **consumer agent** work — same shape as RDP session printers. This hop does not install drivers, speak RDPDR, or vendor IronRDP.
 
 ## Problem
 
 Print happens on the remote OS inside the session. Dashboard chrome alone cannot open the viewer's local print dialog. A permanent product printer that always sits in the OS printer list is the wrong shape for short-lived hops.
 
-## Desired shape (IronRDP / RDPDR-style)
+## Desired shape (IronRDP / RDPDR-style — agent owns this)
 
-Likely implementation should follow the open-source [IronRDP](https://github.com/Devolutions/IronRDP) RDPDR printer path (`ironrdp-rdpdr`, `Rdpdr::with_printer` / `with_printer_driver`), not invent a always-installed MSI printer.
+Likely agent implementation should follow the open-source [IronRDP](https://github.com/Devolutions/IronRDP) RDPDR printer path (`ironrdp-rdpdr`, `Rdpdr::with_printer` / `with_printer_driver`), not invent an always-installed MSI printer.
 
 How that model works:
 
 1. While the session is active (IronRDP advertises the printer after the server's user-logged-on signal), announce a **virtual printer** on the device-redirection channel.
 2. Default server-side driver name is PostScript (`MS Publisher Imagesetter`, same default FreeRDP uses for CUPS PostScript redirect). `with_printer_driver` exists when the host needs a different installed driver; that choice controls the byte format the OS writes.
-3. Print IRPs are **Create → Write (many) → Close**. The backend accumulates raw job bytes on Write and finalizes on Close. The client stays format-agnostic until it converts (often PostScript → PDF) for the user.
-4. Present the finished job in the **browser** print preview / print dialog (Google Docs–like), not by leaving a permanent queue on the remote PC.
-5. When the hop tears down, the virtual printer goes with the session (RDP session-printer UX). No always-on printer between sessions.
+3. Print IRPs are **Create → Write (many) → Close**. The backend accumulates raw job bytes on Write and finalizes on Close.
+4. **Convert PostScript → PDF** (Imagesetter / FreeRDP shape) before sending to the hop. Prefer `application/pdf`.
+5. Present the finished job in the **browser** print preview / print dialog (Google Docs–like) via a print JSON frame — not by leaving a permanent queue on the remote PC.
+6. When the hop tears down, the virtual printer goes with the session (RDP session-printer UX). No always-on printer between sessions.
 
-This hop is **not** an RDP stack and should not speak RDPDR on the wire. Steal the *shape* (session-scoped virtual printer + stream-until-close + convert + local print UI). The consumer agent owns how the OS sees that printer; the hop only needs a way to carry the finished document to the viewer.
+This hop is **not** an RDP stack and should not speak RDPDR on the wire. Steal the *shape* (session-scoped virtual printer + stream-until-close + convert + local print UI). The consumer agent owns how the OS sees that printer; the hop only carries the finished document to the viewer.
 
 ## Hop vs consumer
 
 | Layer | Owns |
 | --- | --- |
-| Consumer agent | Session-scoped virtual printer (RDPDR-like or native equivalent), Create/Write/Close buffering, PostScript→PDF (or other) conversion, add on pair / remove on teardown |
-| Hop | Forward opaque bytes (same mint/pair/TTL story); does not implement RDPDR or install drivers |
-| Viewer / chrome | Receive the finished PDF (or printable blob) and open browser print preview. Selkies chrome is not a printer driver |
+| Consumer agent | **Session-only** virtual printer (RDPDR-like or native equivalent): add on pair / remove on teardown, Create/Write/Close buffering, PostScript→PDF (or other) conversion |
+| Hop | Forward opaque envelopes (same mint/pair/TTL story); does not parse print JSON, implement RDPDR, or install drivers |
+| Viewer / chrome | Receive `{t:"print",…}` frames, reassemble chunks, open the **browser** print dialog / preview (`iframe` + `contentWindow.print()`). Selkies chrome is not a printer driver |
 
-This repo stays pairing + opaque `frame` / `input` / `audio`. The sample agent stays a pipe proof; do not grow it into a desktop print or RDPDR stack.
+## Shipped viewer contract
 
-## Sketch hop contract (not shipping)
+After Close + convert, the agent sends one document on a kind `0x01` frame as UTF-8 JSON (same pattern as clipboard / file). Keep `public/viewer.html` in sync with `src/json-frame.ts` (`PrintFrame` / `printFromFrame`).
 
-After Close, the agent has one document. Prefer reusing the JSON-frame / file pattern already used for clipboard and downloads rather than a new envelope kind, unless size forces something else:
+### Single-shot
 
-- Agent → browser: e.g. `{ "t": "print", "mime": "application/pdf", "name": "…", "data": "<base64>" }` on a `frame` payload (or chunked equivalent)
-- Viewer: decode PDF, open a blob URL, trigger the browser print UI (or a small preview sheet)
+```json
+{ "t": "print", "mime": "application/pdf", "name": "document.pdf", "data": "<base64>" }
+```
 
-Today envelopes larger than **1 MiB** are dropped (`MAX_ENVELOPE_BYTES`). Real print jobs often exceed that; any implementation must decide chunking, a side download, or a raised cap before claiming print works. Treat the shape above as a sketch only.
+Omit `part` / `parts`, or set `parts` to `1`. Defaults: `name` → `print.pdf`, `mime` → `application/pdf`, `job` → `single`, `part` → `0`, `parts` → `1`.
 
-Reference (read, do not vendor into this repo unless you deliberately take a dependency later):
+### Chunking (1 MiB envelope)
 
-- [IronRDP](https://github.com/Devolutions/IronRDP) / crate `ironrdp-rdpdr`
-- `Rdpdr::with_printer(device_id, print_name)` and `RdpdrBackend::handle_printer_io_request`
-- Spec backdrop: [MS-RDPEFS](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpefs/34d9de58-b2b5-40b6-b970-f82d4603bdb5) device redirection (printers are one device class)
+Envelopes larger than **1 MiB** are dropped (`MAX_ENVELOPE_BYTES`). For larger PDFs, split the **raw bytes** into slices, base64-encode each slice, and send:
 
-## Out of scope (for now)
+```json
+{ "t": "print", "job": "<id>", "part": 0, "parts": 3, "mime": "application/pdf", "name": "document.pdf", "data": "<base64 of byte slice>" }
+```
 
-- Shipping RDPDR, IronRDP, or an RDP client in this repo
-- Implementing drivers, port monitors, or installer packaging here
+- `job` groups chunks; `part` is 0-based; `part >= parts` is rejected.
+- Viewer decodes each `data` to bytes, concatenates in `part` order, then prints.
+- Incomplete jobs are cleared on disconnect.
+
+### Viewer behavior
+
+1. Prefer PDF (`application/pdf`). Images (`image/*`) also open print preview.
+2. Non-PDF / non-image mime falls back to the same download path as `{t:"file",…}`.
+3. Printable jobs: base64→`Blob`→hidden iframe→`contentWindow.print()` (browser print dialog / preview, Google Docs–like). On failure: try `window.open` then `print()`, else download.
+4. Optional chrome hint (no blob URL cross-frame): `parent.postMessage({ type: "printJob", name, mime }, origin)` — fine if the parent ignores it.
+
+**Silent printing is out of scope for the web viewer.** Browsers require the system print dialog; there is no silent OS spool from this iframe path. Silent / direct OS spool belongs to a **desktop client** only, not the hop viewer.
+
+## Out of scope (this repo)
+
+- Shipping RDPDR, IronRDP, or an RDP client
+- Implementing drivers, port monitors, or installer packaging
 - A permanent printer that survives outside a paired session
+- Silent print / OS spool from the browser viewer
+- Canvas screenshot “print”
 - Apps, Sharing, or Gaming chrome
 - Claiming the hop understands spool or PostScript beyond opaque bytes
 

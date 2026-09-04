@@ -137,10 +137,11 @@ The same JSON-frame pattern carries the remote cursor *shape* (not pointer posit
 
 Pointer / key / wheel remain **input** JSON (browser → agent). Cursor JSON is a **frame** (agent → browser). CSS cursors toggle (original dashboard UI) hides the overlay and uses a normal local pointer; default is the remote overlay (`canvas.style.cursor='none'`).
 
-An agent can send two more JSON frame shapes:
+An agent can send more JSON frame shapes:
 
 - `{t:"file", name, mime, data}` — trigger a browser download from base64 data
 - `{t:"stats", system_stats, gpu_stats, fps, network_stats, currentAudioLevel}` — optionally fill the CPU, memory, GPU, latency, and audio gauges. `system`/`gpu`/`network` and `audio_level` aliases are accepted. The viewer measures FPS and bandwidth when those fields are absent.
+- `{t:"print", mime, name, data}` — finished session print job (prefer `application/pdf` after agent PostScript→PDF). Optional chunking: `job`, `part`, `parts` where each `data` is base64 of a byte slice. Viewer opens browser print preview; see [print-redirect.md](print-redirect.md).
 
 A consumer applies pointer/key/wheel to the OS. Windows SendInput is out of this repo. Sample `examples/agent.mjs` proves the pipe + can send one cursor bitmap; it only logs input.
 
@@ -152,7 +153,7 @@ Frames and audio stay agent → browser. Input stays browser → agent.
 
 Apps and sharing have no hop yet. Gaming stays out unless asked. Encoder / video settings belong to the capture agent; there is no pixelflux on this hop.
 
-Parked idea (not built): session-scoped print redirect so a paired session can open the viewer's browser print dialog without a permanent OS printer. See [print-redirect.md](print-redirect.md).
+Shipped viewer contract for session print: agent → hop → browser may send `{t:"print", mime, name, data}` (optional `job` / `part` / `parts` for chunking under the 1 MiB envelope). The viewer opens the browser print dialog / preview for PDF (and images); non-printable mime falls back to download. The **session-only virtual printer** (appear on pair, remove on teardown) and PostScript→PDF conversion stay **consumer agent** work — not in this repo. Silent OS spool is desktop-client only; the web viewer always uses the browser print UI. See [print-redirect.md](print-redirect.md).
 
 Visible chrome after this hop: screen and agent-owned encoder/frame-rate/JPEG-quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, a Ctrl+Alt+Del shortcut, fullscreen, theme, and mobile keyboard. Paint-over and other Selkies-only encoder controls remain hidden.
 

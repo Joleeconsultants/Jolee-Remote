@@ -4,6 +4,7 @@ import {
   cursorFromFrame,
   fileFromFrame,
   parseJsonFrameObject,
+  printFromFrame,
   statsFromFrame,
 } from "../src/json-frame";
 
@@ -74,5 +75,50 @@ describe("json frames (clipboard + cursor)", () => {
       fps: 30,
       system: { cpu_percent: 12 },
     });
+  });
+
+  it("parses single-shot print frames with defaults", () => {
+    expect(
+      printFromFrame(utf8('{"t":"print","mime":"application/pdf","name":"job.pdf","data":"JVBERg=="}')),
+    ).toEqual({
+      name: "job.pdf",
+      mime: "application/pdf",
+      data: "JVBERg==",
+      job: "single",
+      part: 0,
+      parts: 1,
+    });
+    expect(printFromFrame(utf8('{"type":"print","data":"QQ=="}'))).toEqual({
+      name: "print.pdf",
+      mime: "application/pdf",
+      data: "QQ==",
+      job: "single",
+      part: 0,
+      parts: 1,
+    });
+  });
+
+  it("parses chunked print fields and rejects bad part", () => {
+    expect(
+      printFromFrame(
+        utf8(
+          '{"t":"print","job":"j1","part":1,"parts":3,"mime":"application/pdf","name":"a.pdf","data":"YQ=="}',
+        ),
+      ),
+    ).toEqual({
+      name: "a.pdf",
+      mime: "application/pdf",
+      data: "YQ==",
+      job: "j1",
+      part: 1,
+      parts: 3,
+    });
+    expect(
+      printFromFrame(
+        utf8('{"t":"print","job":"j1","part":3,"parts":3,"data":"YQ=="}'),
+      ),
+    ).toBeNull();
+    expect(printFromFrame(utf8('{"t":"print"}'))).toBeNull();
+    expect(printFromFrame(utf8('{"t":"file","name":"x","data":"YQ=="}'))).toBeNull();
   });
 });

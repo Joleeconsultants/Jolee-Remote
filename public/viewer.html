@@ -44,6 +44,7 @@ let audioEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
 let microphoneStream=null, microphoneRecorder=null, webcamStream=null, webcamTimer=null;
 let frameCount=0, statsStartedAt=performance.now(), bytesSinceStats=0;
 let agentStats={};
+const printJobChunks=new Map();
 // Remote overlay is the default (Selkies idea). CSS cursors toggle (original UI) switches to a local pointer.
 let useBrowserCursors=false, pointerOver=false, agentCursorVisible=true;
 let cursorHx=DEFAULT_CURSOR_HX, cursorHy=DEFAULT_CURSOR_HY;
@@ -94,6 +95,22 @@ function statsFromFrame(payload){
   const obj=parseJsonFrameObject(payload);
   if(!obj||!(obj.t==="stats"||obj.type==="stats")) return null;
   return obj;
+}
+function printFromFrame(payload){
+  const obj=parseJsonFrameObject(payload);
+  if(!obj||!(obj.t==="print"||obj.type==="print")) return null;
+  if(typeof obj.data!=="string") return null;
+  const parts=typeof obj.parts==="number"&&isFinite(obj.parts)&&obj.parts>=1?Math.floor(obj.parts):1;
+  const part=typeof obj.part==="number"&&isFinite(obj.part)&&obj.part>=0?Math.floor(obj.part):0;
+  if(part>=parts) return null;
+  return {
+    name:typeof obj.name==="string"&&obj.name?obj.name:"print.pdf",
+    mime:typeof obj.mime==="string"&&obj.mime?obj.mime:"application/pdf",
+    data:obj.data,
+    job:typeof obj.job==="string"&&obj.job?obj.job:"single",
+    part,
+    parts
+  };
 }
 function clipboardTextFromFrame(payload){
   const obj=parseJsonFrameObject(payload);
@@ -224,12 +241,91 @@ function downloadFile(file){
   try{
     const raw=atob(file.data), bytes=new Uint8Array(raw.length);
     for(let i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([bytes],{type:file.mime}));
+    downloadBytes({name:file.name,mime:file.mime,bytes});
+  }catch(e){}
+}
+function base64ToBytes(b64){
+  const raw=atob(b64), bytes=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
+  return bytes;
+}
+function downloadBytes(file){
+  try{
+    const url=URL.createObjectURL(new Blob([file.bytes],{type:file.mime||"application/octet-stream"}));
     const link=document.createElement("a");
-    link.href=url; link.download=file.name; link.style.display="none";
+    link.href=url; link.download=file.name||"download"; link.style.display="none";
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){}
+}
+function isPrintableMime(mime){
+  return mime==="application/pdf"||(typeof mime==="string"&&mime.indexOf("image/")===0);
+}
+function openPrintPreview(file){
+  if(!isPrintableMime(file.mime)){
+    downloadBytes(file);
+    return;
+  }
+  let url="";
+  try{
+    url=URL.createObjectURL(new Blob([file.bytes],{type:file.mime}));
+    const iframe=document.createElement("iframe");
+    iframe.setAttribute("aria-hidden","true");
+    iframe.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none";
+    const cleanup=()=>{
+      try{iframe.remove();}catch(e){}
+      if(url){try{URL.revokeObjectURL(url);}catch(e){} url="";}
+    };
+    const tryWindowPrint=()=>{
+      try{
+        const w=window.open(url,"_blank");
+        if(!w){downloadBytes(file);cleanup();return;}
+        const run=()=>{try{w.focus();w.print();}catch(e){downloadBytes(file);} setTimeout(()=>{try{w.close();}catch(e){} cleanup();},60000);};
+        if(w.document&&w.document.readyState==="complete") run();
+        else w.addEventListener("load",run,{once:true});
+      }catch(e){downloadBytes(file);cleanup();}
+    };
+    iframe.addEventListener("load",()=>{
+      try{
+        const win=iframe.contentWindow;
+        if(!win){tryWindowPrint();return;}
+        win.focus();
+        win.print();
+        setTimeout(cleanup,60000);
+      }catch(e){tryWindowPrint();}
+    },{once:true});
+    iframe.src=url;
+    document.body.appendChild(iframe);
+  }catch(e){
+    if(url){try{URL.revokeObjectURL(url);}catch(err){}}
+    downloadBytes(file);
+  }
+}
+function handlePrintFrame(pf){
+  if(window.parent!==window){
+    window.parent.postMessage({type:"printJob",name:pf.name,mime:pf.mime},window.location.origin);
+  }
+  let bytes;
+  try{bytes=base64ToBytes(pf.data);}catch(e){return;}
+  if(pf.parts<=1){
+    openPrintPreview({name:pf.name,mime:pf.mime,bytes});
+    return;
+  }
+  let job=printJobChunks.get(pf.job);
+  if(!job||job.parts!==pf.parts){
+    job={name:pf.name,mime:pf.mime,parts:pf.parts,chunks:new Array(pf.parts)};
+    printJobChunks.set(pf.job,job);
+  }
+  job.name=pf.name;
+  job.mime=pf.mime;
+  job.chunks[pf.part]=bytes;
+  if(!job.chunks.every((chunk)=>chunk instanceof Uint8Array)) return;
+  printJobChunks.delete(pf.job);
+  const total=job.chunks.reduce((n,chunk)=>n+chunk.length,0);
+  const merged=new Uint8Array(total);
+  let offset=0;
+  for(const chunk of job.chunks){merged.set(chunk,offset);offset+=chunk.length;}
+  openPrintPreview({name:job.name,mime:job.mime,bytes:merged});
 }
 function applyAudioSink(el){
   if(!el || !audioSinkId) return;
@@ -264,7 +360,7 @@ async function playAudioChunk(payload){
     }
   }
 }
-function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();stopMicrophone();stopWebcam();setStatus("disconnected");}
+function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();stopMicrophone();stopWebcam();printJobChunks.clear();setStatus("disconnected");}
 function connect(opts){
   if(opts&&typeof opts==="object"){
     if(typeof opts.session==="string") session=opts.session;
@@ -317,6 +413,8 @@ function connect(opts){
     if(file!==null){downloadFile(file);return;}
     const stats=statsFromFrame(env.payload);
     if(stats!==null){agentStats=stats;postStats();return;}
+    const print=printFromFrame(env.payload);
+    if(print!==null){handlePrintFrame(print);return;}
     paintFrame(env.payload);
   });
 }

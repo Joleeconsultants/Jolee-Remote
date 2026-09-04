@@ -92,3 +92,36 @@ export function statsFromFrame(
   if (!obj || !(obj.t === "stats" || obj.type === "stats")) return null;
   return obj;
 }
+
+export type PrintFrame = {
+  name: string;
+  mime: string;
+  data: string;
+  job: string;
+  part: number;
+  parts: number;
+};
+
+/** Agent finished a session print job (often PDF after PostScript convert). */
+export function printFromFrame(payload: Uint8Array): PrintFrame | null {
+  const obj = parseJsonFrameObject(payload);
+  if (!obj || !(obj.t === "print" || obj.type === "print")) return null;
+  if (typeof obj.data !== "string") return null;
+  const parts =
+    typeof obj.parts === "number" && Number.isFinite(obj.parts) && obj.parts >= 1
+      ? Math.floor(obj.parts)
+      : 1;
+  const part =
+    typeof obj.part === "number" && Number.isFinite(obj.part) && obj.part >= 0
+      ? Math.floor(obj.part)
+      : 0;
+  if (part >= parts) return null;
+  return {
+    name: typeof obj.name === "string" && obj.name ? obj.name : "print.pdf",
+    mime: typeof obj.mime === "string" && obj.mime ? obj.mime : "application/pdf",
+    data: obj.data,
+    job: typeof obj.job === "string" && obj.job ? obj.job : "single",
+    part,
+    parts,
+  };
+}
