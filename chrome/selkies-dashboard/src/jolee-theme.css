@@ -1,0 +1,53 @@
+/*
+ * Jolee Remote brand tokens (overlay). Loaded after Overlay.css.
+ * Blues sampled from the JO mark (~#12AAED → #0098E8 → #0689CF).
+ * Keeps the same roles as Selkies pink/violet: fill, label tint, soft wash,
+ * and a two-stop wordmark gradient (lighter sky → deeper azure).
+ */
+
+:root,
+.theme-dark {
+  --accent: #0098e8;
+  --accent-strong: #12aaed;
+  --accent-text: #7dd3fc;
+  --accent-text-strong: #bae6fd;
+  --accent-soft: rgba(0, 152, 232, 0.16);
+  --accent-border: rgba(0, 152, 232, 0.5);
+  /* Secondary cool stop (was violet) — slightly deeper for link contrast */
+  --violet: #38bdf8;
+  --violet-strong: #7dd3fc;
+  /* Wordmark: lighter sky → deeper azure (same 100deg wash as Selkies) */
+  --wordmark-from: #5ec8f5;
+  --wordmark-to: #0689cf;
+  --button-bg: #38bdf8;
+  --button-text: #12161d;
+  --button-hover-bg: var(--accent-text);
+  --gamepad-pad-fill: #0284c7;
+  --gamepad-pad-stroke: #38bdf8;
+  --gamepad-pad-pressed-fill: #7dd3fc;
+  --gamepad-stick-base-fill: #0c4a6e;
+  --gamepad-stick-top-fill: #0ea5e9;
+  --gamepad-stick-top-stroke: #7dd3fc;
+}
+
+.theme-light {
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-text: var(--accent);
+  --accent-text-strong: var(--accent-strong);
+  --accent-soft: rgba(2, 132, 199, 0.12);
+  --accent-border: rgba(2, 132, 199, 0.4);
+  --violet: #0369a1;
+  --violet-strong: #075985;
+  --wordmark-from: #0ea5e9;
+  --wordmark-to: #0369a1;
+  --button-bg: var(--accent);
+  --button-text: #ffffff;
+  --button-hover-bg: var(--accent-strong);
+  --gamepad-pad-fill: #0284c7;
+  --gamepad-pad-stroke: #0369a1;
+  --gamepad-pad-pressed-fill: #075985;
+  --gamepad-stick-base-fill: #bae6fd;
+  --gamepad-stick-top-fill: #0ea5e9;
+  --gamepad-stick-top-stroke: #0369a1;
+}

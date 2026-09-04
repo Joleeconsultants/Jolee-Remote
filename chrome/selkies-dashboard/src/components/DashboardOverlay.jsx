@@ -11,6 +11,7 @@
 import ReactDOM from 'react-dom';
 import Sidebar from './Sidebar';
 import '../styles/Overlay.css';
+import '../jolee-theme.css';
 
 /**
  * Renders the sidebar into `container` through a portal, or nothing until a
