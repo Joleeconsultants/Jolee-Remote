@@ -42,7 +42,7 @@ flowchart LR
 | Need | Prefer (existing) | Do not build here | Hop wire |
 | --- | --- | --- | --- |
 | Mint + join URLs | This hop: `POST /sessions`, `joins.browser` / `joins.agent` ([agent.md](agent.md)) | Custom pairing DO | HTTP + WSS |
-| Screen capture | OS APIs: Windows DXGI / WGC (or platform equivalent); encode JPEG/WebP stills | Selkies pixelflux / RFB / UltraVNC in this repo | kind `0x01` frame bytes |
+| Screen capture | OS APIs: Windows DXGI / WGC (or platform equivalent); encode H.264 (preferred) or JPEG/WebP stills | Selkies pixelflux / RFB / UltraVNC in this repo | kind `0x01` frame bytes |
 | Pointer / key / wheel | OS inject (e.g. Windows `SendInput`); honor viewer JSON | Fake input in the Worker | kind `0x02` input JSON |
 | Ctrl+Alt+Del | Same inject path; viewer sends `{t:"command", command:"ctrl-alt-delete"}` | Custom CAD in chrome only | input JSON |
 | Cursor shape | Your capture stack’s cursor bitmap + hotspot | Copying selkies-web-core | frame JSON `{t:"cursor",…}` |
@@ -71,7 +71,7 @@ Full print how-to: [print-redirect.md](print-redirect.md).
 ## Checklist for a first real agent
 
 1. Mint with secret; open `joins.browser`; agent dials `joins.agent`; wait for `paired`. Use `src/agent-tools.ts` for envelope/input/frame helpers.
-2. Capture → JPEG/WebP frames under 1 MiB; optional audio `0x03`.
+2. Capture → H.264 (preferred) or JPEG/WebP frames under 1 MiB; optional audio `0x03`.
 3. Apply pointer/key/wheel/command on device.
 4. Clipboard / cursor / files / stats as needed (JSON frames + input).
 5. Print: session queue → buffer → Ghostscript → print frames.

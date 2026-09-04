@@ -99,7 +99,7 @@ Every binary WebSocket message:
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | version (`0x01`) |
-| 1 | 1 | kind: `0x01` frame (agent → browser, JPEG/WebP stills), `0x02` input (browser → agent, JSON opaque), `0x03` audio (agent → browser, complete media chunk) |
+| 1 | 1 | kind: `0x01` frame (agent → browser, H.264 or JPEG/WebP), `0x02` input (browser → agent, JSON opaque), `0x03` audio (agent → browser, complete media chunk) |
 | 2.. | n | opaque payload |
 
 No RFB. The hop does not interpret pixels, codecs, or OS events. Malformed envelopes and unknown kinds are dropped. Frames and audio only from the agent connection to the browser connection. Input only from the browser connection to the agent connection. `encodeEnvelope` / `decodeEnvelope` are in `src/envelope.ts`.
@@ -156,7 +156,7 @@ Apps and sharing have no hop yet. Gaming stays out unless asked. Encoder / video
 
 Shipped viewer contract for session print: agent → hop → browser may send `{t:"print", mime, name, data}` (optional `job` / `part` / `parts` for chunking under the 1 MiB envelope). The viewer opens the browser print dialog / preview for PDF (and images); non-printable mime falls back to download. The **session-only virtual printer** (appear on pair, remove on teardown) and PostScript→PDF conversion stay **consumer agent** work — not in this repo. Silent OS spool is desktop-client only; the web viewer always uses the browser print UI. See [print-redirect.md](print-redirect.md). Cite IronRDP ironrdp-rdpdr for Create/Write/Close job semantics when building the consumer.
 
-Visible chrome after this hop: screen and agent-owned encoder/frame-rate/JPEG-quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, a Ctrl+Alt+Del shortcut, fullscreen, theme, and mobile keyboard. Paint-over and other Selkies-only encoder controls remain hidden.
+Visible chrome after this hop: screen and agent-owned encoder preference (default H.264; JPEG fallback) + frame-rate/JPEG-quality settings, PC clipboard text+image, audio playback, microphone capture, files, webcam, stats, a Ctrl+Alt+Del shortcut, fullscreen, theme, and mobile keyboard. Paint-over and other Selkies-only encoder controls remain hidden.
 
 ### Max binary message size
 
@@ -196,7 +196,7 @@ What existing tools to use for capture, input, print, clipboard, audio, etc.: [c
 **You keep:**
 - Anything beyond the mint secret and join tokens (users, tenants, Access)
 - Devices / identity / fleet agent
-- Capture encoding (JPEG/WebP stills recommended) — e.g. LetLeeIn / DXGI / WGC in **your** agent (not this repo)
+- Capture encoding (H.264 preferred; JPEG/WebP stills OK) — e.g. LetLeeIn / DXGI / WGC in **your** agent (not this repo)
 - Applying opaque input JSON on the device (SendInput etc. stay OS-side)
 - Hop wire helpers shipped here: import `src/agent-tools.ts` (parsers + frame builders). OS capture/inject/print binaries stay out.
 

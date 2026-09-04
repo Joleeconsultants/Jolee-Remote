@@ -8,10 +8,11 @@
  * Overlay hide-flags for the vendored sidebar. Add chrome back as the hop
  * grows; Apps and Sharing stay hidden until their hop exists.
  * Hide gaming (gamepads, gaming mode, trackpad, extra players).
- * Audio playback (kind 0x03) and screen size / DPI / HiDPI are unlocked.
- * Microphone, webcam, files, stats, shortcuts, and agent-owned encoder/video
- * settings have hop paths. There is no pixelflux. Image clipboard
- * is unlocked. Prefer this overlay for flags so Sidebar patches stay small.
+ * Audio playback (kind 0x03), microphone, webcam, and screen size / DPI /
+ * HiDPI are unlocked (core toggles enabled / toggleable). Files, stats,
+ * shortcuts, and agent-owned encoder preference (default H.264; JPEG fallback) has a hop path. There
+ * is no pixelflux. Image clipboard is unlocked. Prefer this overlay for
+ * flags so Sidebar patches stay small.
  * Locked settings make isRenderable return false (or hide the manual
  * resolution block via serverSettings.manual_resolution.locked).
  */
@@ -60,7 +61,7 @@ export const JOLEE_SERVER_SETTINGS = {
     allowed: ["96", "120", "144", "168", "192", "216", "240", "264", "288"],
   },
   manual_resolution: { value: false },
-  encoder: { value: "jpeg", allowed: ["jpeg", "h264enc"] },
+  encoder: { value: "h264enc", allowed: ["h264enc", "jpeg"] },
   framerate: { value: 60, min: 8, max: 240 },
   jpeg_quality: { value: 80, default: 80, min: 1, max: 100 },
   use_paint_over_quality: { value: false, locked: true },
