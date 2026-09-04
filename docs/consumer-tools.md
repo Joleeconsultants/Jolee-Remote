@@ -1,0 +1,68 @@
+# Consumer agent tool map
+
+**Audience:** someone building the outbound hop agent (capture, input, print, …).  
+**Rule:** prefer existing tools and OS APIs. Do not reinvent stacks this hop already defines on the wire, and do not copy large projects into this repo — depend on them in **your** agent so they update upstream.
+
+This hop only ships mint/pair/TTL, opaque envelopes, and the Selkies viewer. Everything below is **your** side unless marked “shipped here.”
+
+## End-to-end map
+
+```mermaid
+flowchart LR
+  App[Your app / portal] -->|POST /sessions| Hop[This hop Worker]
+  App -->|open joins.browser| Viewer[Selkies chrome + viewer]
+  Agent[Your device agent] -->|joins.agent WSS| Hop
+  Hop <-->|frame / input / audio| Agent
+  Agent --> Capture[Screen / audio capture]
+  Agent --> Inject[Pointer / key inject]
+  Agent --> Print[Session printer + PS to PDF]
+```
+
+## Tool map (use these)
+
+| Need | Prefer (existing) | Do not build here | Hop wire |
+| --- | --- | --- | --- |
+| Mint + join URLs | This hop: `POST /sessions`, `joins.browser` / `joins.agent` ([agent.md](agent.md)) | Custom pairing DO | HTTP + WSS |
+| Screen capture | OS APIs: Windows DXGI / WGC (or platform equivalent); encode JPEG/WebP stills | Selkies pixelflux / RFB / UltraVNC in this repo | kind `0x01` frame bytes |
+| Pointer / key / wheel | OS inject (e.g. Windows `SendInput`); honor viewer JSON | Fake input in the Worker | kind `0x02` input JSON |
+| Ctrl+Alt+Del | Same inject path; viewer sends `{t:"command", command:"ctrl-alt-delete"}` | Custom CAD in chrome only | input JSON |
+| Cursor shape | Your capture stack’s cursor bitmap + hotspot | Copying selkies-web-core | frame JSON `{t:"cursor",…}` |
+| Clipboard text/image | OS clipboard APIs ↔ hop JSON | New envelope kinds | input / frame `{t:"clipboard",…}` |
+| Audio playback to browser | Your encode → complete media chunks | New codec in the hop | kind `0x03` audio |
+| Mic / webcam from browser | Browser already captures; agent consumes `{t:"mic"}` / `{t:"webcam"}` | Re-encoding in the Worker | input JSON |
+| Files | OS file I/O; hop `{t:"file",…}` | Extra transfer protocol | input / frame JSON |
+| Stats gauges | Your process/GPU metrics → `{t:"stats",…}`; viewer also measures FPS/bandwidth | Pixelflux stats | frame JSON |
+| Encoder / quality settings | Your encoder; honor `{t:"settings",…}` / resize | Claiming this hop has pixelflux | input JSON |
+| **Session print** | See below | Custom RDPDR fork in this repo | frame `{t:"print",…}` |
+| Auth / tenants / devices | Your portal / Access / fleet | Tenants in this public hop | outside hop |
+| Browser print UI | **Shipped here** — viewer print dialog | Silent print from Chrome | — |
+
+## Print path (detail)
+
+| Step | Tool |
+| --- | --- |
+| Session-only queue | Windows print APIs (add on **paired**, remove on teardown). RDP session-printer UX. |
+| Job lifecycle (Create / Write / Close) | Cite [IronRDP](https://github.com/Devolutions/IronRDP) [`ironrdp-rdpdr`](https://crates.io/crates/ironrdp-rdpdr) (`Rdpdr::with_printer`, `handle_printer_io_request`). Depend on the crate in an RDP-**client** consumer; on a device agent, mirror that lifecycle against your session queue — do not vendor IronRDP into this hop. Spec: [MS-RDPEFS](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpefs/34d9de58-b2b5-40b6-b970-f82d4603bdb5). |
+| Default PS driver name | `MS Publisher Imagesetter` (IronRDP / FreeRDP default) when present on the host |
+| PostScript → PDF | **Ghostscript** (or equivalent). Convert **before** the hop. |
+| Send to browser | This hop: `{t:"print", mime:"application/pdf", …}` (+ chunking). Viewer opens print dialog. |
+
+Full print how-to: [print-redirect.md](print-redirect.md).
+
+## Checklist for a first real agent
+
+1. Mint with secret; open `joins.browser`; agent dials `joins.agent`; wait for `paired`.
+2. Capture → JPEG/WebP frames under 1 MiB; optional audio `0x03`.
+3. Apply pointer/key/wheel/command on device.
+4. Clipboard / cursor / files / stats as needed (JSON frames + input).
+5. Print: session queue → buffer → Ghostscript → print frames.
+6. Teardown: stop capture, remove session printer, drop sockets.
+
+Sample `examples/agent.mjs` only proves the pipe (placeholder frames + cursor). It is not a capture or print agent.
+
+## Related
+
+- [agent.md](agent.md) — mint, envelope, input shapes
+- [print-redirect.md](print-redirect.md) — print how-to + IronRDP cites
+- [chrome.md](chrome.md) — viewer chrome
+- [architecture.md](architecture.md) — pairing diagram

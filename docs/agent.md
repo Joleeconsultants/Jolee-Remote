@@ -173,6 +173,10 @@ First-message join failures close the socket (`4003` invalid token, `4009` role 
 
 TTL alarm or either **joined** peer dropping ends the session. Later joins are rejected. A socket that never sent a join token does not tear the session down.
 
+## Consumer tool map
+
+What existing tools to use for capture, input, print, clipboard, audio, etc.: [consumer-tools.md](consumer-tools.md). Print detail: [print-redirect.md](print-redirect.md).
+
 ## What you keep vs the hop
 
 **Hop:** mint, 1:1 pair, forward opaque envelopes, hibernate, TTL teardown.

@@ -120,7 +120,7 @@ Auth in this repo is the mint secret plus mint-time join tokens. No tenants, dev
 
 ## Building the agent
 
-How to plug in (mint secret, Selkies join URL, envelope, token paths): [docs/agent.md](docs/agent.md). Session print how-to (viewer shipped; consumer printer cited to IronRDP): [docs/print-redirect.md](docs/print-redirect.md).
+How to plug in (mint secret, Selkies join URL, envelope, token paths): [docs/agent.md](docs/agent.md). Consumer tool map: [docs/consumer-tools.md](docs/consumer-tools.md). Session print how-to (viewer shipped; consumer printer cited to IronRDP): [docs/print-redirect.md](docs/print-redirect.md).
 
 The agent is a WebSocket **client**.
 

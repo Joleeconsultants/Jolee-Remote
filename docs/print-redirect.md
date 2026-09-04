@@ -6,6 +6,10 @@
 
 Agent → hop → browser may send a finished document as a kind `0x01` JSON frame. The viewer opens the **browser print dialog** (Google Docs–like). Silent OS spool is not available from Chrome.
 
+## Tool map
+
+Full consumer map (capture, input, clipboard, print, …): [consumer-tools.md](consumer-tools.md).
+
 ## Consumer how-to (Windows session printer → hop PDF)
 
 Build this in the **consumer agent**, not in this hop repo.
