@@ -140,6 +140,7 @@ const en = {
         },
         clipboard: {
             uploadImage: "Upload Image",
+            uploadImageTitle: "Upload an image to the remote clipboard",
             title: "Clipboard",
             label: "PC Clipboard:",
             placeholder: "Clipboard content from the PC...",

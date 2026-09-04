@@ -71,3 +71,17 @@
 .sidebar-header .header-controls {
   flex: 0 0 auto;
 }
+
+/* Clipboard Upload Image: keep app-action-button size/position; outline like Files. */
+.dashboard-clipboard-item .app-action-button.clipboard-upload-image {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--surface-inset);
+  color: var(--text);
+  border: 1px solid var(--item-border);
+}
+.dashboard-clipboard-item .app-action-button.clipboard-upload-image:hover {
+  border-color: var(--accent-border);
+  background-color: var(--surface-alt);
+  color: var(--text);
+}

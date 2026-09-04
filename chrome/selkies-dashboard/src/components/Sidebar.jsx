@@ -4332,9 +4332,9 @@ function Sidebar() {
                       enableBinaryClipboard && (
                         <div className="dashboard-clipboard-item">
                           <button
-                            className="resolution-button"
-                            style={{ marginTop: "5px", marginBottom: "5px" }}
+                            className="app-action-button clipboard-upload-image"
                             onClick={() => clipboardImageInputRef.current?.click()}
+                            title={t("sections.clipboard.uploadImageTitle", "Upload an image to the remote clipboard")}
                           >
                             {t("sections.clipboard.uploadImage", "Upload Image")}
                           </button>
