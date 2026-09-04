@@ -4,6 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+
+import './jolee-sidebar-gutter.js';
 /**
  * Overlay hide-flags for the vendored sidebar. Add chrome back as the hop
  * grows; Apps and Sharing stay hidden until their hop exists.

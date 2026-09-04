@@ -52,16 +52,8 @@
   --gamepad-stick-top-stroke: #0369a1;
 }
 
-/* Clipboard Upload Image: keep app-action-button size/position; outline like Files. */
-.dashboard-clipboard-item .app-action-button.clipboard-upload-image {
-  width: 100%;
-  box-sizing: border-box;
-  background-color: var(--surface-inset);
-  color: var(--text);
-  border: 1px solid var(--item-border);
-}
-.dashboard-clipboard-item .app-action-button.clipboard-upload-image:hover {
-  border-color: var(--accent-border);
-  background-color: var(--surface-alt);
-  color: var(--text);
+/* Dynamic gutter: only while .sidebar overflows (class toggled by jolee-sidebar-gutter.js). */
+.sidebar.has-scrollbar {
+  /* Stock 280px + Overlay.css thin scrollbar width */
+  width: calc(280px + 8px);
 }
