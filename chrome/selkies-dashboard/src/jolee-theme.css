@@ -54,6 +54,6 @@
 
 /* Dynamic gutter: only while .sidebar overflows (class toggled by jolee-sidebar-gutter.js). */
 .sidebar.has-scrollbar {
-  /* Stock 280px + Overlay.css thin scrollbar width */
-  width: calc(280px + 8px);
+  /* Stock 280px + live scrollbar width (--jolee-sb from jolee-sidebar-gutter.js) */
+  width: calc(280px + var(--jolee-sb, 8px));
 }
