@@ -106,7 +106,8 @@ No RFB. The hop does not interpret pixels, codecs, or OS events. Malformed envel
 
 ### Applying input (viewer JSON)
 
-The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSON in kind `input`. Honor these shapes on the device:
+The hop forwards input bytes opaquely. The Selkies chrome viewer sends UTF-8 JSON in kind `input`. Honor these shapes on the device. Helpers: `parseInputPayload` / `parseInputJson` from `src/input.ts` (re-exported by `src/agent-tools.ts`); CAD spellings normalize like the viewer to `ctrl-alt-delete`.
+
 
 - `{t:"pointer", e, x, y, b}` — `e` is `move` / `down` / `up`; `x`/`y` are 0–1 over the displayed image (`object-fit` contain vs stretch). `b` is `buttons` on move, `button` on down/up
 - `{t:"wheel", dx, dy, x, y}` — canvas wheel; `dx`/`dy` are `deltaX`/`deltaY`; context menu is suppressed so right-click stays in the session
@@ -173,6 +174,17 @@ First-message join failures close the socket (`4003` invalid token, `4009` role 
 
 TTL alarm or either **joined** peer dropping ends the session. Later joins are rejected. A socket that never sent a join token does not tear the session down.
 
+
+## Pairing (agent builder view)
+
+```mermaid
+flowchart LR
+  Browser[Browser / Selkies viewer] <-->|opaque envelopes| Hop[Hop Worker + Session DO]
+  Hop <-->|outbound WSS agent| Agent[Device agent]
+```
+
+1:1 pair only. Wait for `status` / `paired` before binary frames. Capture and inject are agent-local; the hop only forwards.
+
 ## Consumer tool map
 
 What existing tools to use for capture, input, print, clipboard, audio, etc.: [consumer-tools.md](consumer-tools.md). Print detail: [print-redirect.md](print-redirect.md).
@@ -184,5 +196,7 @@ What existing tools to use for capture, input, print, clipboard, audio, etc.: [c
 **You keep:**
 - Anything beyond the mint secret and join tokens (users, tenants, Access)
 - Devices / identity / fleet agent
-- Capture encoding (JPEG/WebP stills recommended)
-- Applying opaque input JSON on the device
+- Capture encoding (JPEG/WebP stills recommended) — e.g. LetLeeIn / DXGI / WGC in **your** agent (not this repo)
+- Applying opaque input JSON on the device (SendInput etc. stay OS-side)
+- Hop wire helpers shipped here: import `src/agent-tools.ts` (parsers + frame builders). OS capture/inject/print binaries stay out.
+

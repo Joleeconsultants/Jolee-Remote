@@ -5,6 +5,25 @@
 
 This hop only ships mint/pair/TTL, opaque envelopes, and the Selkies viewer. Everything below is **your** side unless marked “shipped here.”
 
+## Hop protocol toolkit (shipped here)
+
+Import (or copy) **`src/agent-tools.ts`** — the single entry for hop wire helpers a device agent needs:
+
+- Envelope: `encodeEnvelope` / `decodeEnvelope`, kinds, `MAX_ENVELOPE_BYTES`
+- Join paths: `viewerPath`, `agentJoinPath`, …
+- Input parse: `parseInputPayload` / `parseInputJson` (`src/input.ts`) — browser → agent kind `0x02` JSON
+- Frame builders: `encodeClipboard*Frame`, `encodeCursorFrame`, `encodeFileFrame`, `encodeStatsFrame`, `encodePrintFrames` (`src/agent-frames.ts`) — agent → browser kind `0x01` JSON
+- Frame parsers: `printFromFrame`, `fileFromFrame`, … (`src/json-frame.ts`)
+
+**Wire format only.** Capture (DXGI / WGC / LetLeeIn native capture when you wire it), SendInput inject, Ghostscript PS→PDF, and IronRDP-style print job lifecycle stay in **your** agent — do not fork those designs into this repo. `examples/agent.mjs` stays a tiny synthetic pipe proof.
+
+```mermaid
+flowchart LR
+  Browser[Browser / Selkies viewer] <-->|frame 0x01 / input 0x02 / audio 0x03| Hop[Hop Worker + Session DO]
+  Hop <-->|same opaque envelopes| Agent[Your device agent]
+  Agent -.->|OS-side only| Cap[Capture / inject / print]
+```
+
 ## End-to-end map
 
 ```mermaid
@@ -51,7 +70,7 @@ Full print how-to: [print-redirect.md](print-redirect.md).
 
 ## Checklist for a first real agent
 
-1. Mint with secret; open `joins.browser`; agent dials `joins.agent`; wait for `paired`.
+1. Mint with secret; open `joins.browser`; agent dials `joins.agent`; wait for `paired`. Use `src/agent-tools.ts` for envelope/input/frame helpers.
 2. Capture → JPEG/WebP frames under 1 MiB; optional audio `0x03`.
 3. Apply pointer/key/wheel/command on device.
 4. Clipboard / cursor / files / stats as needed (JSON frames + input).
@@ -63,6 +82,7 @@ Sample `examples/agent.mjs` only proves the pipe (placeholder frames + cursor). 
 ## Related
 
 - [agent.md](agent.md) — mint, envelope, input shapes
+- `src/agent-tools.ts` — hop protocol toolkit (import/copy)
 - [print-redirect.md](print-redirect.md) — print how-to + IronRDP cites
 - [chrome.md](chrome.md) — viewer chrome
 - [architecture.md](architecture.md) — pairing diagram
