@@ -688,7 +688,8 @@ function AppsModal({ isOpen, onClose, t, commandsAvailable, commandsKnown,
             <p>{error}</p>
             <button
               onClick={() => setFetchAttempt((n) => n + 1)}
-              className="app-action-button install"
+              className="resolution-button"
+                            style={{ marginTop: "5px", marginBottom: "5px" }}
             >
               {t("appsModal.retryButton", "Retry")}
             </button>
@@ -4331,7 +4332,8 @@ function Sidebar() {
                       enableBinaryClipboard && (
                         <div className="dashboard-clipboard-item">
                           <button
-                            className="app-action-button install"
+                            className="resolution-button"
+                            style={{ marginTop: "5px", marginBottom: "5px" }}
                             onClick={() => clipboardImageInputRef.current?.click()}
                           >
                             {t("sections.clipboard.uploadImage", "Upload Image")}

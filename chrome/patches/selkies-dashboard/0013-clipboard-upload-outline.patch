@@ -1,0 +1,13 @@
+diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
+--- a/src/components/Sidebar.jsx
++++ b/src/components/Sidebar.jsx
+@@ -4331,8 +4331,9 @@
+                       enableBinaryClipboard && (
+                         <div className="dashboard-clipboard-item">
+                           <button
+-                            className="app-action-button install"
++                            className="resolution-button"
++                            style={{ marginTop: "5px", marginBottom: "5px" }}
+                             onClick={() => clipboardImageInputRef.current?.click()}
+                           >
+                             {t("sections.clipboard.uploadImage", "Upload Image")}
