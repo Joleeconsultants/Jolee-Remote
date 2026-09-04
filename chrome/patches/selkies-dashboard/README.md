@@ -37,7 +37,7 @@ Image clipboard stays on input JSON / JSON frame. Cursor shape is the same JSON-
 
 ## Overlay vs patches
 
-- Overlay files listed in `chrome/selkies-dashboard/OVERLAY` are never overwritten by sync (`jolee-settings.js`, `jolee-bridge.js`, `jolee-shims/`, `jolee-theme.css`, …). Put hop-only hide-flags, brand CSS, brand CSS, and postMessage glue there.
+- Overlay files listed in `chrome/selkies-dashboard/OVERLAY` are never overwritten by sync (`jolee-settings.js`, `jolee-bridge.js`, `jolee-shims/`, `jolee-theme.css`, …). Put hop-only hide-flags, brand CSS, and postMessage glue there.
 - Patches in this directory are rewires of vendored Selkies files (`Sidebar.jsx`, translations, …). Keep them small.
 
 ## Series

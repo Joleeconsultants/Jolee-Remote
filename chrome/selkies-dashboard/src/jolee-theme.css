@@ -51,11 +51,3 @@
   --gamepad-stick-top-fill: #0ea5e9;
   --gamepad-stick-top-stroke: #0369a1;
 }
-
-/* Scrollbar must not steal content width when sections open/close.
- * Stable gutter + matching widen = stock content size always; bar paints in
- * the reserved strip (empty when unused). Overlay-only — no Sidebar patch. */
-.sidebar {
-  width: calc(280px + 8px);
-  scrollbar-gutter: stable;
-}
