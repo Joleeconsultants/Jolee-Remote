@@ -1,6 +1,6 @@
-This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
-
 # Dashboard chrome
+
+Product session UI that maps Selkies visual and functional experience onto the Jolee hop. Panels without a hop path remain hidden until one exists.
 
 `/` is the product session UI: modified Selkies dashboard chrome (MPL-2.0) over the hop.
 
@@ -12,13 +12,13 @@ Dashboard chrome is MPL-2.0 (see `chrome/selkies-dashboard/LICENSE`). The hop (`
 
 ## Goal
 
-This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
+Extract Selkies visual and functional experience onto the Jolee hop. Leftover panels wait until a hop path exists.
 
-Add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+Add a real hop path, then show the ORIGINAL Selkies dashboard control. Prefer original UI with only small mods (`postToCore`, overlay hide-flags in `jolee-settings.js`, PC Clipboard label). Do not invent a new UI or large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
 
-Leftover list = recommended features not yet hopped, not a junk drawer. CSS cursors is original dashboard UI; the remote cursor overlay is hop core in `/viewer.html`.
+The leftover list is recommended features not yet hopped, not a junk drawer. CSS cursors is original dashboard UI; the remote cursor overlay is hop core in `/viewer.html`.
 
-The chrome only keeps controls the hop can actually drive. Add chrome back as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
+Chrome keeps only controls the hop can drive. Restore chrome as the hop grows. Hide-flags live in overlay `jolee-settings.js`. The patch series documents that rule in [chrome/patches/selkies-dashboard/README.md](../chrome/patches/selkies-dashboard/README.md).
 
 ## Brand and sidebar gutter (overlay)
 
@@ -118,11 +118,11 @@ flowchart LR
 
 ### Goal
 
-This product extracts Selkies visual and functional experience onto the Jolee hop. Leftover panels still wait for a hop.
+Extract Selkies visual and functional experience onto the Jolee hop. Leftover panels wait until a hop path exists.
 
-Add a real hop path, then show the ORIGINAL Selkies dashboard control. Use original UI with only small mods (postToCore, overlay hide-flags in jolee-settings.js, PC Clipboard label). Do not invent a new UI. Do not write large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
+Add a real hop path, then show the ORIGINAL Selkies dashboard control. Prefer original UI with only small mods (`postToCore`, overlay hide-flags in `jolee-settings.js`, PC Clipboard label). Do not invent a new UI or large Sidebar rewrites. Gaming stays out unless asked. Slow-add: a panel appears only after its hop exists.
 
-Leftover list = recommended features not yet hopped, not a junk drawer.
+The leftover list is recommended features not yet hopped, not a junk drawer.
 
 This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack (no selkies-web-core).
 

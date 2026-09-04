@@ -1,8 +1,8 @@
-# Plug in your app
+# Agent integration
 
-Quick path: your backend mints a session on the hop Worker, opens the Selkies HTML URL, and your agent outbound-connects to the Worker. The hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` / `audio` bytes. Pairing is 1:1; N browsers is a later consumer need.
+Your backend mints a session on the hop Worker, opens the Selkies HTML URL, and your agent outbound-connects to the Worker. The hop pairs exactly one browser socket with exactly one agent socket and forwards opaque `frame` / `input` / `audio` bytes. Pairing is 1:1; N browsers is a later consumer need.
 
-Helpers for join URLs live in `src/joins.ts` (`viewerPath` is the product browser join).
+Join URL helpers live in `src/joins.ts` (`viewerPath` is the product browser join).
 
 ## Mint
 

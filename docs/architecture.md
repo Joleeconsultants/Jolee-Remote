@@ -1,6 +1,8 @@
-# Hop diagrams
+# Architecture
 
-See the root README to plug in your app. The hop is:
+Reusable Cloudflare Durable Objects session-pairing framework: mint, pair browser + outbound agent WebSocket, hibernation, TTL, teardown.
+
+Session-pairing hop on Cloudflare Workers and Durable Objects. See the root README for integration. Diagrams below:
 
 ```mermaid
 flowchart LR
@@ -9,7 +11,7 @@ flowchart LR
   Agent[Outbound agent] --> DO
 ```
 
-The browser goes through the Worker into the session Durable Object. The agent outbound-connects to that same Durable Object. The DO never dials out.
+The browser joins through the Worker into the session Durable Object. The agent outbound-connects to that same Durable Object. The DO never dials out.
 
 ```mermaid
 sequenceDiagram
@@ -31,9 +33,9 @@ sequenceDiagram
 
 ## Chrome vs hop
 
-`/` is Selkies chrome (modified dashboard, MPL-2.0), the session UI.
+`/` is Selkies chrome (modified dashboard, MPL-2.0), the product session UI.
 
-`/viewer.html` is the canvas hole (MIT): PartySocket + envelope + paint + input + postMessage. The Worker and session Durable Object are the MIT pairing pipe. This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack. See chrome.md.
+`/viewer.html` is the canvas hole (MIT): PartySocket + envelope + paint + input + postMessage. The Worker and session Durable Object are the MIT pairing pipe. This repo ships modified Selkies dashboard chrome, not the Selkies streaming stack. See [chrome.md](chrome.md).
 
 ```mermaid
 flowchart TB
