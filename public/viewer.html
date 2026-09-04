@@ -26,7 +26,7 @@ canvas.stretch{object-fit:fill}
 // Must match root package.json partysocket (currently 1.1.6).
 import PartySocket from "https://esm.sh/partysocket@1.1.6";
 const VERSION=1, KIND_FRAME=1, KIND_INPUT=2, KIND_AUDIO=3;
-const AUDIO_TYPES=["audio/webm","audio/ogg","audio/wav","audio/mpeg"];
+const AUDIO_TYPES=["audio/wav","audio/webm","audio/ogg","audio/mpeg"];
 const DEFAULT_CURSOR_SVG="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round" d="M1 1v16.5l4.2-4.3 3.3 8 2.5-1-3.3-7.9H15z"/></svg>');
 const DEFAULT_CURSOR_HX=1, DEFAULT_CURSOR_HY=1;
 const canvas=document.getElementById("surface");
@@ -40,7 +40,8 @@ let session=params.get("session")||"";
 let token=hashParams.get("token")||params.get("token")||"";
 let hop=params.get("hop")||"";
 let socket=null, videoDecoder=null, scaleLocally=true, antiAliasing=true;
-let audioEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
+let audioEnabled=true, videoEnabled=true, audioSinkId="", playingAudio=null, audioUrl=null;
+let pendingAudioPayload=null, audioFailLogged=false;
 let microphoneStream=null, microphoneRecorder=null, webcamStream=null, webcamTimer=null;
 let frameCount=0, statsStartedAt=performance.now(), bytesSinceStats=0;
 let agentStats={};
@@ -333,14 +334,47 @@ function applyAudioSink(el){
     Promise.resolve(el.setSinkId(audioSinkId)).catch(()=>{});
   }
 }
+function setVideoEnabled(enabled){
+  videoEnabled=!!enabled;
+  if(!videoEnabled){
+    try{
+      ctx.fillStyle="#000";
+      ctx.fillRect(0,0,canvas.width||1,canvas.height||1);
+    }catch(e){}
+  }
+  postPipelineStatus("video", videoEnabled);
+}
 function setAudioEnabled(enabled){
   audioEnabled=!!enabled;
   if(playingAudio) playingAudio.muted=!audioEnabled;
-  if(!audioEnabled) stopAudioPlayback();
+  postPipelineStatus("audio", audioEnabled);
+  if(!audioEnabled){pendingAudioPayload=null;stopAudioPlayback();return;}
+  // Sound toggle is a user gesture in chrome — retry pending chunk if autoplay blocked earlier.
+  if(pendingAudioPayload){
+    const pending=pendingAudioPayload;
+    pendingAudioPayload=null;
+    playAudioChunk(pending);
+  }
+}
+function audioTypesFor(payload){
+  // Prefer real container from magic bytes so WAV is not tried as webm/ogg first.
+  if(payload&&payload.length>=12&&payload[0]===0x52&&payload[1]===0x49&&payload[2]===0x46&&payload[3]===0x46&&payload[8]===0x57&&payload[9]===0x41&&payload[10]===0x56&&payload[11]===0x45){
+    return ["audio/wav","audio/wave"].concat(AUDIO_TYPES.filter((t)=>t!=="audio/wav"));
+  }
+  if(payload&&payload.length>=4&&payload[0]===0x4f&&payload[1]===0x67&&payload[2]===0x67&&payload[3]===0x53){
+    return ["audio/ogg"].concat(AUDIO_TYPES.filter((t)=>t!=="audio/ogg"));
+  }
+  if(payload&&payload.length>=4&&payload[0]===0x1a&&payload[1]===0x45&&payload[2]===0xdf&&payload[3]===0xa3){
+    return ["audio/webm"].concat(AUDIO_TYPES.filter((t)=>t!=="audio/webm"));
+  }
+  return AUDIO_TYPES.slice();
 }
 async function playAudioChunk(payload){
   if(!audioEnabled) return;
-  for(const type of AUDIO_TYPES){
+  const types=audioTypesFor(payload);
+  let lastErr=null;
+  let blocked=false;
+  for(const type of types){
     const url=URL.createObjectURL(new Blob([payload],{type}));
     const el=new Audio();
     el.muted=!audioEnabled;
@@ -351,14 +385,32 @@ async function playAudioChunk(payload){
       stopAudioPlayback();
       audioUrl=url;
       playingAudio=el;
+      pendingAudioPayload=null;
+      audioFailLogged=false;
       el.muted=!audioEnabled;
       applyAudioSink(el);
       el.addEventListener("ended",()=>{if(audioUrl===url){revokeAudioUrl();if(playingAudio===el)playingAudio=null;}},{once:true});
+      console.info("[jolee] audio play ok", type, payload.length);
       return;
     }catch(e){
+      lastErr=e;
       try{URL.revokeObjectURL(url);}catch(err){}
+      if(e&&e.name==="NotAllowedError"){blocked=true;break;}
     }
   }
+  if(blocked) pendingAudioPayload=payload;
+  if(!audioFailLogged){
+    audioFailLogged=true;
+    const name=lastErr&&lastErr.name||"Error";
+    const msg=lastErr&&lastErr.message||String(lastErr||"play failed");
+    console.warn("[jolee] audio play failed", name, msg, blocked?"(autoplay; click canvas or sound toggle to retry)":"");
+  }
+}
+function unlockAudioFromGesture(){
+  if(!pendingAudioPayload||!audioEnabled) return;
+  const pending=pendingAudioPayload;
+  pendingAudioPayload=null;
+  playAudioChunk(pending);
 }
 function disconnect(){if(socket){socket.close();socket=null;}if(videoDecoder){try{videoDecoder.close();}catch(e){}videoDecoder=null;}stopAudioPlayback();stopMicrophone();stopWebcam();printJobChunks.clear();setStatus("disconnected");}
 function connect(opts){
@@ -415,6 +467,7 @@ function connect(opts){
     if(stats!==null){agentStats=stats;postStats();return;}
     const print=printFromFrame(env.payload);
     if(print!==null){handlePrintFrame(print);return;}
+    if(!videoEnabled) return;
     paintFrame(env.payload);
   });
 }
@@ -494,6 +547,7 @@ canvas.addEventListener("pointerdown",(e)=>{
   pointerOver=true;
   moveOverlay(e);
   applyCursorMode();
+  unlockAudioFromGesture();
   const p=pointerNorm(e);
   sendInput({t:"pointer",e:"down",x:p.x,y:p.y,b:e.button});
 });
@@ -552,6 +606,7 @@ window.addEventListener("message",(event)=>{
       applyCursorMode();
       break;
     case "pipelineControl":
+      if(msg.pipeline==="video") setVideoEnabled(!!msg.enabled);
       if(msg.pipeline==="audio") setAudioEnabled(!!msg.enabled);
       if(msg.pipeline==="microphone") setMicrophoneEnabled(!!msg.enabled);
       if(msg.pipeline==="webcam") setWebcamEnabled(!!msg.enabled);
