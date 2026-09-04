@@ -1,15 +1,3 @@
-diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
---- a/src/components/Sidebar.jsx
-+++ b/src/components/Sidebar.jsx
-@@ -1419,7 +1419,7 @@ function Sidebar() {
-     audioSettings: false,
-     screenSettings: false,
-     stats: false,
--    clipboard: false,
-+    clipboard: true,
-     // A phone lands on gamepads: the reason to open the dashboard on touch at all.
-     gamepads: isMobileClient,
-     files: false,
 diff --git a/src/translations.js b/src/translations.js
 --- a/src/translations.js
 +++ b/src/translations.js

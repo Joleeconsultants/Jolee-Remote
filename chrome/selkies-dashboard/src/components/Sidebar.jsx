@@ -1419,7 +1419,7 @@ function Sidebar() {
     audioSettings: false,
     screenSettings: false,
     stats: false,
-    clipboard: true,
+    clipboard: false,
     // A phone lands on gamepads: the reason to open the dashboard on touch at all.
     gamepads: isMobileClient,
     files: false,
