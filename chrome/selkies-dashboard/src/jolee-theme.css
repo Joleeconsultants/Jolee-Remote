@@ -52,21 +52,6 @@
   --gamepad-stick-top-stroke: #0369a1;
 }
 
-/* Wordmark stays one row beside theme/fullscreen; no scrollbar-gutter (stock scroll). */
-.sidebar-header {
-  flex-wrap: nowrap;
-}
-.sidebar-header h2 {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sidebar-header .header-controls {
-  flex: 0 0 auto;
-}
-
 /* Clipboard Upload Image: keep app-action-button size/position; outline like Files. */
 .dashboard-clipboard-item .app-action-button.clipboard-upload-image {
   width: 100%;
