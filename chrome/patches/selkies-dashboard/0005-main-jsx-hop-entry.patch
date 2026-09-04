@@ -63,23 +63,12 @@ diff --git a/src/main.jsx b/src/main.jsx
 -  } catch (err) {
 -    console.warn(`Error detecting initial mode: ${err}`);
 -  }
+-}
 +const dashboardRootElement = document.createElement("div");
 +dashboardRootElement.id = "dashboard-root";
 +dashboardRootElement.classList.add("allow-native-input");
 +document.body.appendChild(dashboardRootElement);
-+
-+const appMountPoint = document.getElementById("root");
-+if (appMountPoint) {
-+  ReactDOM.createRoot(appMountPoint).render(
-+    <React.StrictMode>
-+      <App dashboardRoot={dashboardRootElement} />
-+    </React.StrictMode>,
-+  );
-+  queueMicrotask(postJoleeServerSettings);
-+} else {
-+  console.error("Dashboard mount point #root not found.");
- }
--
+ 
 -const currentHash = window.location.hash;
 -const noDashboardModes = ['#shared', '#player2', '#player3', '#player4'];
 -const playerClientModes = ['#player2', '#player3', '#player4'];
@@ -118,3 +107,14 @@ diff --git a/src/main.jsx b/src/main.jsx
 -    );
 -  }
 -})();
++const appMountPoint = document.getElementById("root");
++if (appMountPoint) {
++  ReactDOM.createRoot(appMountPoint).render(
++    <React.StrictMode>
++      <App dashboardRoot={dashboardRootElement} />
++    </React.StrictMode>,
++  );
++  requestAnimationFrame(function () { postJoleeServerSettings(); setTimeout(postJoleeServerSettings, 0); setTimeout(postJoleeServerSettings, 50); });
++} else {
++  console.error("Dashboard mount point #root not found.");
++}

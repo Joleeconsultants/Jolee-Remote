@@ -170,22 +170,52 @@ else
   done < <(ls -1 "$PATCH_DIR"/*.patch 2>/dev/null | sort)
 fi
 
+restore_clean_upstream() {
+  echo "sync: restoring clean ${UPSTREAM_PATH} @ ${TARGET} (plus overlay)" >&2
+  while IFS= read -r rel || [ -n "$rel" ]; do
+    [ -n "$rel" ] || continue
+    rel="${rel#./}"
+    if is_overlay "$rel"; then
+      continue
+    fi
+    if should_skip_src "$rel"; then
+      continue
+    fi
+    mkdir -p "$DEST/$(dirname "$rel")"
+    cp -a "$SRC/$rel" "$DEST/$rel"
+  done < "$ALL_SRC"
+  while IFS= read -r rel || [ -n "$rel" ]; do
+    [ -n "$rel" ] || continue
+    rel="${rel#./}"
+    if is_overlay "$rel"; then
+      continue
+    fi
+    if should_skip_src "$rel"; then
+      continue
+    fi
+    if ! grep -Fxq "$rel" "$SRC_LIST"; then
+      rm -f "$DEST/$rel"
+    fi
+  done < "$ALL_DEST"
+}
+
 if [ "${#PATCHES[@]}" -eq 0 ]; then
   echo "sync: no patches to apply"
 else
-  echo "sync: checking ${#PATCHES[@]} patch(es)"
+  # Quilt-style: each patch builds on the previous. Check+apply in series so
+  # later patches can depend on earlier rewires (e.g. jolee-shims imports).
+  echo "sync: applying ${#PATCHES[@]} patch(es) in series order"
   for p in "${PATCHES[@]}"; do
     [ -f "$p" ] || die "patch listed but missing: $p"
     if ! git apply --check --directory=chrome/selkies-dashboard "$p"; then
       echo >&2
       echo "error: patch failed to apply: ${p#"$ROOT"/}" >&2
       echo "Refresh chrome/patches/selkies-dashboard/ against this upstream and re-run." >&2
+      restore_clean_upstream
       echo "Working tree now has a clean copy of ${UPSTREAM_PATH} @ ${TARGET} plus overlay files." >&2
       echo "That failure is the signal a human/PR must refresh the patch series." >&2
       exit 1
     fi
-  done
-  for p in "${PATCHES[@]}"; do
     git apply --directory=chrome/selkies-dashboard "$p"
     echo "sync: applied ${p#"$ROOT"/}"
   done

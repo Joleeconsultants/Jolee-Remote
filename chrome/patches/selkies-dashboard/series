@@ -5,3 +5,4 @@
 0006-gitignore-keep-package-lock.patch
 0008-hide-sharing-until-enabled.patch
 0009-clipboard-open-pc-label.patch
+0010-shortcuts-command.patch
