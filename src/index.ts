@@ -1,4 +1,4 @@
-import { routePartykitRequest } from "partyserver";
+import { getServerByName, routePartykitRequest } from "partyserver";
 import { Session, type Env } from "./session";
 import { randomToken } from "./tokens";
 import {
@@ -50,10 +50,23 @@ export default {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
         return json({ error: "expected websocket upgrade" }, 426);
       }
-      const stub = env.Session.getByName(sessionId);
-      return stub.fetch(withQuery(request, { role }));
+      // Prefer getServerByName (calls setName) over raw getByName+fetch: local
+      // wrangler often leaves ctx.id.name undefined. Keep x-partykit-room as a
+      // fallback if the WebSocket Request rewrite drops memory state.
+      const stub = await getServerByName(env.Session, sessionId);
+      const fwd = withQuery(request, { role });
+      const headers = new Headers(fwd.headers);
+      headers.set("x-partykit-room", sessionId);
+      return stub.fetch(new Request(fwd, { headers }));
     }
 
+    // routePartykitRequest uses idFromName+fetch but does not set x-partykit-room.
+    // Under local wrangler (ctx.id.name often undefined), ensure __ps_name via setName
+    // so PartySocket browser joins work after mint and on reconnect.
+    const partyMatch = url.pathname.match(/^\/parties\/session\/([^/]+)/);
+    if (partyMatch) {
+      await getServerByName(env.Session, partyMatch[1]);
+    }
     const party = await routePartykitRequest(request, env);
     if (party) return party;
 
@@ -86,7 +99,9 @@ async function mint(request: Request, env: Env): Promise<Response> {
   const browserToken = randomToken();
   const agentToken = randomToken();
   const hop = new URL(request.url).host;
-  const stub = env.Session.getByName(sessionId);
+  // getServerByName calls setName so hibernation/alarms have a persisted __ps_name
+  // even when local wrangler leaves ctx.id.name undefined.
+  const stub = await getServerByName(env.Session, sessionId);
   try {
     const minted = await stub.mint({
       sessionId,

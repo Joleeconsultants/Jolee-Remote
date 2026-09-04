@@ -52,6 +52,8 @@ export class Session extends Server<Env> {
     agentToken: string;
     ttlSeconds?: number;
   }): Promise<{ sessionId: string; expiresAt: number; ttlSeconds: number }> {
+    // Persist PartyServer name for alarms/hibernation when ctx.id.name is missing.
+    await this.setName(input.sessionId);
     const existing = this.loadRow();
     if (existing) {
       throw new Error("session already minted");
