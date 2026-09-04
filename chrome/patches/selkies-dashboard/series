@@ -6,3 +6,4 @@
 0008-hide-sharing-until-enabled.patch
 0009-clipboard-open-pc-label.patch
 0010-shortcuts-command.patch
+0011-core-toggle-optimistic.patch

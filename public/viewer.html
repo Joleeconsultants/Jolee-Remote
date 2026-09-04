@@ -206,7 +206,7 @@ async function setMicrophoneEnabled(enabled){
     microphoneRecorder.addEventListener("stop",()=>postPipelineStatus("microphone",false),{once:true});
     microphoneRecorder.start(250);
     postPipelineStatus("microphone",true);
-  }catch(e){stopMicrophone();}
+  }catch(e){console.warn("[jolee] microphone start failed", e && e.name, e && e.message);stopMicrophone();}
 }
 function stopWebcam(){
   if(webcamTimer!==null) clearInterval(webcamTimer);
@@ -236,7 +236,7 @@ async function setWebcamEnabled(enabled){
     };
     capture(); webcamTimer=setInterval(capture,500);
     postPipelineStatus("webcam",true);
-  }catch(e){stopWebcam();}
+  }catch(e){console.warn("[jolee] webcam start failed", e && e.name, e && e.message);stopWebcam();}
 }
 function downloadFile(file){
   try{

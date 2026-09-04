@@ -52,5 +52,6 @@ Image clipboard stays on input JSON / JSON frame. Cursor shape is the same JSON-
 | `0008-hide-sharing-until-enabled.patch` | seed hop settings; sharing/gamepads only if explicitly enabled |
 | `0009-clipboard-open-pc-label.patch` | “PC Clipboard” copy only (panel stays closed by default) |
 | `0010-shortcuts-command.patch` | make Shortcuts send Ctrl+Alt+Del; remove out-of-scope gaming rows |
+| `0011-core-toggle-optimistic.patch` | optimistic active state for screen/speaker/mic/webcam toggles |
 
 See also `docs/chrome.md`.
